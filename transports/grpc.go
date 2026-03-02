@@ -5,7 +5,7 @@ import (
 	"contracts/pkg/endpoint"
 
 	grpctransport "github.com/go-kit/kit/transport/grpc"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp/pncp"
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 )
 
 type GRPCServer struct {

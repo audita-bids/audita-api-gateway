@@ -3,44 +3,52 @@ package endpoint
 import (
 	"context"
 	"contracts/pkg/service"
+	"fmt"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/log"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp/pncp"
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 )
 
 type EndpointSetup struct {
-	Test endpoint.Endpoint
+	GetAvailableLicenses endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
-	var testEndpoint endpoint.Endpoint
+	var GetAvailableLicenses endpoint.Endpoint
 	{
-		testEndpoint = MakeTestEndpoint(s)
+		GetAvailableLicenses = MakeGetAvailableLicensesEndpoint(s)
 		logger.Log("Endpoint value", "ok")
 	}
 
 	return &EndpointSetup{
-		Test: testEndpoint,
+		GetAvailableLicenses: GetAvailableLicenses,
 	}
 }
 
-func MakeTestEndpoint(s service.Service) endpoint.Endpoint {
+func MakeGetAvailableLicensesEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		r := request.(*pncp.PncpRequest)
-		rpcRequest := &pncp.PncpRequest{
-			Name: r.Name,
+		r := request.(*pncp.PncpAvailableLicenseRequest)
+		rpcRequest := &pncp.PncpAvailableLicenseRequest{
+			CodigoMunicipioIbge:         r.CodigoMunicipioIbge,
+			DataInicial:                 r.DataInicial,
+			DataFinal:                   r.DataFinal,
+			CodigoModalidadeContratacao: r.CodigoModalidadeContratacao,
+			Pagina:                      r.Pagina,
+			TamanhoPagina:               r.TamanhoPagina,
 		}
 
-		fc, err := s.Test(ctx, rpcRequest)
+		fmt.Println(r)
+
+		fc, err := s.GetAvailableLicenses(ctx, rpcRequest)
 
 		if err != nil {
 			return &Resp{
 				Error: err,
 			}, nil
 		}
-		return &pncp.PncpResponse{
-			Message: fc.Message,
+		return &Resp{
+			Items: fc,
 		}, nil
 	}
 }

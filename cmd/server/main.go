@@ -15,7 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 	"github.com/project-pncp/private-kit/pkg/lib"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp/pncp"
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 	"google.golang.org/grpc"
 )
 

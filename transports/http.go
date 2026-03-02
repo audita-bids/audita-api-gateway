@@ -11,7 +11,7 @@ import (
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp/pncp"
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 	"go.elastic.co/apm/module/apmgorilla/v2"
 )
 
@@ -20,21 +20,23 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 	apmgorilla.Instrument(r)
 
 	r.Methods("GET").
-		Path("/test").
+		Path("/available-licenses").
 		Handler(httptransport.NewServer(
-			endpoint.Test,
-			getTestDecodeHTTPRequest,
+			endpoint.GetAvailableLicenses,
+			getAvailableLicensesDecodeHTTPRequest,
 			encodeHttpResponse,
 		))
 
 	return r
 }
 
-func getTestDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
-	var req pncp.PncpRequest
-	vars := mux.Vars(r)
+func getAvailableLicensesDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req pncp.PncpAvailableLicenseRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
 
-	req.Name = vars["name"]
+	if err != nil {
+		return nil, err
+	}
 
 	return &req, nil
 }
