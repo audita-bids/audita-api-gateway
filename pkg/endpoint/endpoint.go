@@ -3,26 +3,30 @@ package endpoint
 import (
 	"context"
 	"contracts/pkg/service"
-	"fmt"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/log"
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 )
 
 type EndpointSetup struct {
 	GetAvailableLicenses endpoint.Endpoint
+	CreateClient         endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetAvailableLicenses endpoint.Endpoint
+	var CreateClient endpoint.Endpoint
+
 	{
 		GetAvailableLicenses = MakeGetAvailableLicensesEndpoint(s)
-		logger.Log("Endpoint value", "ok")
+		CreateClient = MakeCreateClientEndpoint(s)
 	}
 
 	return &EndpointSetup{
 		GetAvailableLicenses: GetAvailableLicenses,
+		CreateClient:         CreateClient,
 	}
 }
 
@@ -38,9 +42,23 @@ func MakeGetAvailableLicensesEndpoint(s service.Service) endpoint.Endpoint {
 			TamanhoPagina:               r.TamanhoPagina,
 		}
 
-		fmt.Println(r)
-
 		fc, err := s.GetAvailableLicenses(ctx, rpcRequest)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+		return &Resp{
+			Items: fc,
+		}, nil
+	}
+}
+
+func MakeCreateClientEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*client.CreateClientRequest)
+		fc, err := s.CreateClient(ctx, r)
 
 		if err != nil {
 			return &Resp{

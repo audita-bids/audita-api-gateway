@@ -11,6 +11,7 @@ import (
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 	"go.elastic.co/apm/module/apmgorilla/v2"
 )
@@ -19,11 +20,19 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 	r := mux.NewRouter()
 	apmgorilla.Instrument(r)
 
-	r.Methods("GET").
+	r.Methods(http.MethodGet).
 		Path("/available-licenses").
 		Handler(httptransport.NewServer(
 			endpoint.GetAvailableLicenses,
 			getAvailableLicensesDecodeHTTPRequest,
+			encodeHttpResponse,
+		))
+
+	r.Methods(http.MethodPost).
+		Path("/auth/client").
+		Handler(httptransport.NewServer(
+			endpoint.CreateClient,
+			createClientDecodeHTTPRequest,
 			encodeHttpResponse,
 		))
 
@@ -32,6 +41,17 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 
 func getAvailableLicensesDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req pncp.PncpAvailableLicenseRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func createClientDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req client.CreateClientRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 
 	if err != nil {
@@ -52,7 +72,7 @@ func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response int
 	return json.NewEncoder(w).Encode(response)
 }
 
-func encodeHttpError(ctx context.Context, err error, w http.ResponseWriter) {
+func encodeHttpError(_ context.Context, err error, w http.ResponseWriter) {
 	// encode.HttpHeaders(ctx, w)
 
 	e := strings.ReplaceAll(err.Error(), "rpc error: code = Unknown desc = ", "")

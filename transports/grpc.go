@@ -35,10 +35,10 @@ func NewGRPCServer(endpoints endpoint.EndpointSetup) pncp.PncpServiceServer {
 	return grpcServer
 }
 
-func decodeGRPCRequest(ctx context.Context, req interface{}) (interface{}, error) {
+func decodeGRPCRequest(_ context.Context, req interface{}) (interface{}, error) {
 	return req, nil
 }
 
-func decodeGRPCResponse(ctx context.Context, resp interface{}) (interface{}, error) {
+func decodeGRPCResponse(_ context.Context, resp interface{}) (interface{}, error) {
 	return resp, nil
 }
