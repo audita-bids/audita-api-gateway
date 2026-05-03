@@ -3,7 +3,10 @@ package transports
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"contracts/pkg/endpoint"
@@ -11,6 +14,8 @@ import (
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
+	"github.com/project-pncp/private-kit/decode"
+	"github.com/project-pncp/private-kit/keys"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 	"go.elastic.co/apm/module/apmgorilla/v2"
@@ -26,6 +31,32 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetAvailableLicenses,
 			getAvailableLicensesDecodeHTTPRequest,
 			encodeHttpResponse,
+			httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
+				return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+					{
+						Key:    keys.AuthTokenContext,
+						Header: "Authorization",
+						Value:  r.Header.Get("Authorization"),
+					},
+				})
+			}),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/license/{cnpj}/{year}/{sequence}").
+		Handler(httptransport.NewServer(
+			endpoint.GetLicense,
+			getFindLicenseDecodeHTTPRequest,
+			encodeHttpResponse,
+			httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
+				return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+					{
+						Key:    keys.AuthTokenContext,
+						Header: "Authorization",
+						Value:  r.Header.Get("Authorization"),
+					},
+				})
+			}),
 		))
 
 	r.Methods(http.MethodPost).
@@ -41,10 +72,52 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 
 func getAvailableLicensesDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req pncp.PncpAvailableLicenseRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
 
-	if err != nil {
-		return nil, err
+	q := r.URL.Query()
+
+	req.DataInicial = q.Get("start_date")
+	req.DataFinal = q.Get("final_date")
+
+	if v := q.Get("city_ibge_code"); v != "" {
+		req.CodigoMunicipioIbge = v
+	}
+
+	if v := q.Get("modality_code"); v != "" {
+		req.CodigoModalidadeContratacao = v
+	}
+
+	if v := q.Get("page"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("page inválido: %w", err)
+		}
+		req.Pagina = int32(parsed)
+	}
+
+	if v := q.Get("rows"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("rows inválido: %w", err)
+		}
+		req.TamanhoPagina = int32(parsed)
+	}
+
+	return &req, nil
+}
+
+func getFindLicenseDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	vars := mux.Vars(r)
+	var req pncp.PncpFindLicenseRequest
+
+	req.Cnpj = vars["cnpj"]
+	req.Ano = vars["year"]
+	seqStr := vars["sequence"]
+
+	seqInt, _ := strconv.Atoi(seqStr)
+	req.Sequencial = int32(seqInt)
+
+	if req.Cnpj == "" || req.Ano == "" || req.Sequencial == 0 {
+		return nil, errors.New("invalid params")
 	}
 
 	return &req, nil

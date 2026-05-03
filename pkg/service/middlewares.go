@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-kit/log"
+	"github.com/project-pncp/private-kit/middlewares"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 )
@@ -31,6 +32,15 @@ func (mw *loggingMiddleware) GetAvailableLicenses(ctx context.Context, request *
 
 	mw.logger.Log("method", "GetAvailableLicenses", "status", "started")
 	return mw.next.GetAvailableLicenses(ctx, request)
+}
+
+func (mw *loggingMiddleware) GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (*pncp.PncpFindLicenseResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetLicense", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetLicense", "status", "started")
+	return mw.next.GetLicense(ctx, request)
 }
 
 func (mw *loggingMiddleware) CreateClient(ctx context.Context, request *client.CreateClientRequest) (*client.CreateClientResponse, error) {
@@ -66,6 +76,15 @@ func (mw *recoveryMiddleware) GetAvailableLicenses(ctx context.Context, request 
 	return mw.next.GetAvailableLicenses(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (*pncp.PncpFindLicenseResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetLicense", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetLicense", "status", "started")
+	return mw.next.GetLicense(ctx, request)
+}
+
 func (mw *recoveryMiddleware) CreateClient(ctx context.Context, request *client.CreateClientRequest) (*client.CreateClientResponse, error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -73,5 +92,57 @@ func (mw *recoveryMiddleware) CreateClient(ctx context.Context, request *client.
 		}
 	}()
 
+	return mw.next.CreateClient(ctx, request)
+}
+
+func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
+	return func(next Service) Service {
+		return &authenticationMiddleware{
+			next:    next,
+			logger:  logger,
+			clients: clients,
+		}
+	}
+}
+
+type authenticationMiddleware struct {
+	next    Service
+	logger  log.Logger
+	clients client.ClientServiceClient
+}
+
+func (mw *authenticationMiddleware) GetAvailableLicenses(ctx context.Context, request *pncp.PncpAvailableLicenseRequest) (*pncp.PncpAvailableLicenseResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"licenses:read"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetAvailableLicenses(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (*pncp.PncpFindLicenseResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"licenses:read"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetLicense(ctx, request)
+}
+
+func (mw *authenticationMiddleware) CreateClient(ctx context.Context, request *client.CreateClientRequest) (*client.CreateClientResponse, error) {
 	return mw.next.CreateClient(ctx, request)
 }

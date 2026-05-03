@@ -7,12 +7,13 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1
 	github.com/oklog/run v1.2.0
-	github.com/project-pncp/private-kit v0.0.9
+	github.com/project-pncp/private-kit v0.0.19
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.3
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 )
 
 require (
+	github.com/Oudwins/zog v0.22.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
@@ -30,6 +31,7 @@ require (
 	go.opentelemetry.io/otel v1.40.0 // indirect
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
+	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect

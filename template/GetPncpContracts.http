@@ -1,0 +1,1 @@
+GET {{host}}/available-licenses?data_inicial=20260404&data_final=20260525&codigo_modalidade_contratacao=4&pagina=1&tamanho_pagina=10

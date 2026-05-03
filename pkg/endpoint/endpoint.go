@@ -13,20 +13,24 @@ import (
 type EndpointSetup struct {
 	GetAvailableLicenses endpoint.Endpoint
 	CreateClient         endpoint.Endpoint
+	GetLicense           endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetAvailableLicenses endpoint.Endpoint
 	var CreateClient endpoint.Endpoint
+	var GetLicense endpoint.Endpoint
 
 	{
 		GetAvailableLicenses = MakeGetAvailableLicensesEndpoint(s)
 		CreateClient = MakeCreateClientEndpoint(s)
+		GetLicense = MakeGetLicenseEndpoint(s)
 	}
 
 	return &EndpointSetup{
 		GetAvailableLicenses: GetAvailableLicenses,
 		CreateClient:         CreateClient,
+		GetLicense:           GetLicense,
 	}
 }
 
@@ -65,6 +69,23 @@ func MakeCreateClientEndpoint(s service.Service) endpoint.Endpoint {
 				Error: err,
 			}, nil
 		}
+		return &Resp{
+			Items: fc,
+		}, nil
+	}
+}
+
+func MakeGetLicenseEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*pncp.PncpFindLicenseRequest)
+		fc, err := s.GetLicense(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
 		return &Resp{
 			Items: fc,
 		}, nil
