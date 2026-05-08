@@ -7,7 +7,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1
 	github.com/oklog/run v1.2.0
-	github.com/project-pncp/private-kit v0.0.19
+	github.com/project-pncp/private-kit v0.0.23
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.3
 	google.golang.org/grpc v1.79.3
 )
@@ -26,6 +26,7 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.3 // indirect
 	go.elastic.co/apm/v2 v2.7.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.65.0 // indirect
 	go.opentelemetry.io/otel v1.40.0 // indirect

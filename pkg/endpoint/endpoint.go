@@ -3,34 +3,43 @@ package endpoint
 import (
 	"context"
 	"contracts/pkg/service"
+	"contracts/request"
+	"fmt"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/log"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 )
 
 type EndpointSetup struct {
 	GetAvailableLicenses endpoint.Endpoint
-	CreateClient         endpoint.Endpoint
 	GetLicense           endpoint.Endpoint
+	GetListFavoriteBid   endpoint.Endpoint
+	PostFavoriteBid      endpoint.Endpoint
+	PostAnalysis         endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetAvailableLicenses endpoint.Endpoint
-	var CreateClient endpoint.Endpoint
 	var GetLicense endpoint.Endpoint
+	var GetListFavoriteBid endpoint.Endpoint
+	var PostFavoriteBid endpoint.Endpoint
+	var PostAnalysis endpoint.Endpoint
 
 	{
 		GetAvailableLicenses = MakeGetAvailableLicensesEndpoint(s)
-		CreateClient = MakeCreateClientEndpoint(s)
 		GetLicense = MakeGetLicenseEndpoint(s)
+		GetListFavoriteBid = MakeGetListFavoriteBidEndpoint(s)
+		PostFavoriteBid = MakePostFavoriteBidEndpoint(s)
+		PostAnalysis = MakePostAnalysisEndpoint(s)
 	}
 
 	return &EndpointSetup{
 		GetAvailableLicenses: GetAvailableLicenses,
-		CreateClient:         CreateClient,
 		GetLicense:           GetLicense,
+		GetListFavoriteBid:   GetListFavoriteBid,
+		PostFavoriteBid:      PostFavoriteBid,
+		PostAnalysis:         PostAnalysis,
 	}
 }
 
@@ -59,22 +68,6 @@ func MakeGetAvailableLicensesEndpoint(s service.Service) endpoint.Endpoint {
 	}
 }
 
-func MakeCreateClientEndpoint(s service.Service) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		r := request.(*client.CreateClientRequest)
-		fc, err := s.CreateClient(ctx, r)
-
-		if err != nil {
-			return &Resp{
-				Error: err,
-			}, nil
-		}
-		return &Resp{
-			Items: fc,
-		}, nil
-	}
-}
-
 func MakeGetLicenseEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		r := request.(*pncp.PncpFindLicenseRequest)
@@ -89,6 +82,58 @@ func MakeGetLicenseEndpoint(s service.Service) endpoint.Endpoint {
 		return &Resp{
 			Items: fc,
 		}, nil
+	}
+}
+
+func MakeGetListFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (resp interface{}, err error) {
+		r := request.(*model.FavoriteBidRequest)
+
+		fc, err := s.GetListFavoriteBid(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return &Resp{
+			Items: fc,
+		}, nil
+	}
+}
+
+func MakePostFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (resp interface{}, err error) {
+		r := request.(*model.FavoriteBidRequest)
+
+		fc, err := s.PostFavoriteBid(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostAnalysisEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		fmt.Println(request)
+		r := request.(*model.AnalysisRequest)
+
+		fc, err := s.PostAnalysis(ctx, r)
+		fmt.Println(err)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
 	}
 }
 

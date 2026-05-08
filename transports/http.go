@@ -2,22 +2,23 @@ package transports
 
 import (
 	"context"
+	"contracts/pkg/endpoint"
+	model "contracts/request"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"contracts/pkg/endpoint"
+	apperrors "contracts/pkg/errors"
 
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
 	"github.com/project-pncp/private-kit/decode"
 	"github.com/project-pncp/private-kit/keys"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
+	"github.com/project-pncp/private-kit/query"
 	"go.elastic.co/apm/module/apmgorilla/v2"
 )
 
@@ -59,12 +60,64 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			}),
 		))
 
-	r.Methods(http.MethodPost).
-		Path("/auth/client").
+	r.Methods(http.MethodGet).
+		Path("/favorite-bids").
 		Handler(httptransport.NewServer(
-			endpoint.CreateClient,
-			createClientDecodeHTTPRequest,
+			endpoint.GetListFavoriteBid,
+			decodeGetListFavoriteBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decodeQueryFilterToContext(ctx, r)
+				},
+			),
+		))
+
+	r.Methods(http.MethodPost).
+		Path("/favorite-bid").
+		Handler(httptransport.NewServer(
+			endpoint.PostFavoriteBid,
+			decodePostFavoriteBidHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPost).
+		Path("/{process_id}/analysis").
+		Handler(httptransport.NewServer(
+			endpoint.PostAnalysis,
+			decodeAnalysisHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
 		))
 
 	return r
@@ -123,9 +176,14 @@ func getFindLicenseDecodeHTTPRequest(ctx context.Context, r *http.Request) (requ
 	return &req, nil
 }
 
-func createClientDecodeHTTPRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
-	var req client.CreateClientRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
+func decodeGetListFavoriteBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.FavoriteBidRequest
+	return &req, nil
+}
+
+func decodePostFavoriteBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.FavoriteBidRequest
+	err = req.Decode(r)
 
 	if err != nil {
 		return nil, err
@@ -134,31 +192,74 @@ func createClientDecodeHTTPRequest(ctx context.Context, r *http.Request) (reques
 	return &req, nil
 }
 
+func decodeAnalysisHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.AnalysisRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func decodeQueryFilterToContext(ctx context.Context, r *http.Request) context.Context {
+	q := r.URL.Query()
+
+	filter := query.Filter{
+		Rows: 10,
+		Page: 1,
+	}
+
+	if v := q.Get("rows"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			filter.Rows = n
+		}
+	}
+	if v := q.Get("page"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			filter.Page = n
+		}
+	}
+	if v := q.Get("cursor"); v != "" {
+		filter.Cursor = v
+	}
+	if v := q.Get("sort"); v != "" {
+		filter.Sort.Key = v
+		filter.Sort.Order = q.Get("sort_order")
+		if filter.Sort.Order == "" {
+			filter.Sort.Order = "asc"
+		}
+	}
+	if v := q.Get("term"); v != "" {
+		filter.Term = v
+	}
+
+	return decode.InjectIntoContext(ctx, "filter", filter)
+}
+
 func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-	// Verifica se é um erro primeiro
-	if resp, ok := response.(*endpoint.Resp); ok && resp.Error != nil {
-		encodeHttpError(ctx, resp.Error, w)
+	if resp, ok := response.(*endpoint.Resp); ok {
+		if resp.Error != nil {
+			httpErr := apperrors.ParseError(resp.Error)
+			writeError(w, httpErr)
+			return nil
+		}
+	}
+
+	if err, ok := response.(error); ok {
+		httpErr := apperrors.ParseError(err)
+		writeError(w, httpErr)
 		return nil
 	}
 
-	// encode.HttpHeaders(ctx, w)
+	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(response)
 }
 
-func encodeHttpError(_ context.Context, err error, w http.ResponseWriter) {
-	// encode.HttpHeaders(ctx, w)
-
-	e := strings.ReplaceAll(err.Error(), "rpc error: code = Unknown desc = ", "")
-	switch e {
-	case "invalid cursor":
-		w.WriteHeader(http.StatusBadRequest)
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-
+func writeError(w http.ResponseWriter, httpErr *apperrors.HTTPError) {
 	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error": e,
-	})
+	w.WriteHeader(httpErr.Status)
+	if err := json.NewEncoder(w).Encode(httpErr); err != nil {
+	}
 }
