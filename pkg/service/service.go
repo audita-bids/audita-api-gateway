@@ -3,9 +3,7 @@ package service
 import (
 	"context"
 	"contracts/request"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/go-kit/log"
 	"github.com/project-pncp/private-kit/connectors"
@@ -16,9 +14,6 @@ import (
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 	"github.com/project-pncp/private-kit/query"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -48,7 +43,7 @@ func NewService(logger log.Logger) Service {
 			pncp:    pncp.NewPncpServiceClient(connectors.Pncp()),
 			bids:    bids.NewBidsServiceClient(connectors.Bids()),
 			clients: clients,
-			agents:  agents.NewAgentsServiceClient(dial(dialAddress("AGENTS_HOST"))),
+			agents:  agents.NewAgentsServiceClient(connectors.Agents()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
@@ -111,35 +106,4 @@ func (s *service) PostAnalysis(ctx context.Context, request *model.AnalysisReque
 		Base64:    request.Base64,
 		ProcessId: request.ProcessID,
 	})
-}
-
-func dial(host string) grpc.ClientConnInterface {
-	msgSize := 25000000
-	grpc.EnableTracing = true
-	c, err := grpc.NewClient(host,
-		grpc.WithMaxHeaderListSize(uint32(msgSize)),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(msgSize),
-			grpc.MaxCallSendMsgSize(msgSize),
-		),
-	)
-
-	if err != nil {
-		panic(err)
-	}
-	return c
-}
-
-func dialAddress(adr string) string {
-	d := os.Getenv(adr)
-	if len(d) == 0 {
-		d = strings.ReplaceAll(adr, "_HOST", "")
-		d = strings.ReplaceAll(d, "_", "-")
-		d = strings.ToLower(d)
-		d = d + ":9090"
-	}
-
-	return d
 }
