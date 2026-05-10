@@ -1,0 +1,12 @@
+POST {{host}}/holding-bid
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "process_id": "12345",
+  "sequence": 1,
+  "origin": 1,
+  "publication_date": "2025-01-15",
+  "proposal_opening_date": "2025-02-01",
+  "proposal_closing_date": "2025-02-15"
+}

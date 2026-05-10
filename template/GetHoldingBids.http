@@ -1,0 +1,2 @@
+GET {{host}}/holding-bids?rows=30&page=1&cursor=&sort=createdAt&sort-order=desc
+Authorization: Bearer {{auth_token}}

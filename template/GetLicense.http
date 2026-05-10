@@ -1,0 +1,2 @@
+GET {{host}}/license/75371401000157/2026/17
+Authorization: Bearer {{auth_token}}
