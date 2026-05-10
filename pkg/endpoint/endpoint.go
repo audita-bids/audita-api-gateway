@@ -4,10 +4,10 @@ import (
 	"context"
 	"contracts/pkg/service"
 	"contracts/request"
-	"fmt"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/log"
+	"github.com/project-pncp/private-kit/middlewares"
 	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
 )
 
@@ -17,6 +17,8 @@ type EndpointSetup struct {
 	GetListFavoriteBid   endpoint.Endpoint
 	PostFavoriteBid      endpoint.Endpoint
 	PostAnalysis         endpoint.Endpoint
+	PostHoldingBid       endpoint.Endpoint
+	GetListHoldingBid    endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -25,13 +27,40 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetListFavoriteBid endpoint.Endpoint
 	var PostFavoriteBid endpoint.Endpoint
 	var PostAnalysis endpoint.Endpoint
+	var PostHoldingBid endpoint.Endpoint
+	var GetListHoldingBid endpoint.Endpoint
+
+	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "contracts")
+	metricsMiddleware := middlewares.MetricsMiddleware("contracts")
 
 	{
 		GetAvailableLicenses = MakeGetAvailableLicensesEndpoint(s)
+		GetAvailableLicenses = loggingMiddleware("GetAvailableLicenses")(GetAvailableLicenses)
+		GetAvailableLicenses = metricsMiddleware("GetAvailableLicenses")(GetAvailableLicenses)
+
 		GetLicense = MakeGetLicenseEndpoint(s)
+		GetLicense = loggingMiddleware("GetLicense")(GetLicense)
+		GetLicense = metricsMiddleware("GetLicense")(GetLicense)
+
 		GetListFavoriteBid = MakeGetListFavoriteBidEndpoint(s)
+		GetListFavoriteBid = loggingMiddleware("GetListFavoriteBid")(GetListFavoriteBid)
+		GetListFavoriteBid = metricsMiddleware("GetListFavoriteBid")(GetListFavoriteBid)
+
 		PostFavoriteBid = MakePostFavoriteBidEndpoint(s)
+		PostFavoriteBid = loggingMiddleware("PostFavoriteBid")(PostFavoriteBid)
+		PostFavoriteBid = metricsMiddleware("PostFavoriteBid")(PostFavoriteBid)
+
 		PostAnalysis = MakePostAnalysisEndpoint(s)
+		PostAnalysis = loggingMiddleware("PostAnalysis")(PostAnalysis)
+		PostAnalysis = metricsMiddleware("PostAnalysis")(PostAnalysis)
+
+		PostHoldingBid = MakePostHoldingBidEndpoint(s)
+		PostHoldingBid = loggingMiddleware("PostHoldingBid")(PostHoldingBid)
+		PostHoldingBid = metricsMiddleware("PostHoldingBid")(PostHoldingBid)
+
+		GetListHoldingBid = MakeGetListHoldingBidEndpoint(s)
+		GetListHoldingBid = loggingMiddleware("GetListHoldingBid")(GetListHoldingBid)
+		GetListHoldingBid = metricsMiddleware("GetListHoldingBid")(GetListHoldingBid)
 	}
 
 	return &EndpointSetup{
@@ -40,6 +69,8 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListFavoriteBid:   GetListFavoriteBid,
 		PostFavoriteBid:      PostFavoriteBid,
 		PostAnalysis:         PostAnalysis,
+		PostHoldingBid:       PostHoldingBid,
+		GetListHoldingBid:    GetListHoldingBid,
 	}
 }
 
@@ -99,6 +130,7 @@ func MakeGetListFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
 
 		return &Resp{
 			Items: fc,
+			Total: fc.Total,
 		}, nil
 	}
 }
@@ -121,11 +153,9 @@ func MakePostFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
 
 func MakePostAnalysisEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		fmt.Println(request)
 		r := request.(*model.AnalysisRequest)
 
 		fc, err := s.PostAnalysis(ctx, r)
-		fmt.Println(err)
 
 		if err != nil {
 			return &Resp{
@@ -134,6 +164,40 @@ func MakePostAnalysisEndpoint(s service.Service) endpoint.Endpoint {
 		}
 
 		return fc, nil
+	}
+}
+
+func MakePostHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.HoldingRequest)
+
+		fc, err := s.PostHoldingBid(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetListHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.HoldingRequest)
+
+		fc, err := s.GetListHoldingBid(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return &Resp{
+			Items: fc,
+		}, nil
 	}
 }
 

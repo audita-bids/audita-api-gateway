@@ -23,6 +23,9 @@ type Service interface {
 	PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.PostFavoriteBidResponse, error)
 	GetListFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.GetListFavoriteBidResponse, error)
 	PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error)
+
+	PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error)
+	GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error)
 }
 
 type service struct {
@@ -79,19 +82,9 @@ func (s *service) GetListFavoriteBid(ctx context.Context, request *model.Favorit
 	filter, _ := decode.GetFromContext[query.Filter](ctx, "filter")
 	user, _ := decode.GetFromContext[*client.AuthClientResponse](ctx, keys.ClientContext)
 
-	md := metadata.New(map[string]string{
-		"rows":       strconv.FormatInt(filter.Rows, 10),
-		"page":       strconv.FormatInt(filter.Page, 10),
-		"cursor":     filter.Cursor,
-		"sort":       filter.Sort.Key,
-		"sort-order": filter.Sort.Order,
-		"term":       filter.Term,
-	})
-
-	ctx = metadata.NewOutgoingContext(ctx, md)
 	request.UserId = user.Id
 
-	return s.bids.GetListFavoriteBid(ctx, &bids.GetListFavoriteBidRequest{
+	return s.bids.GetListFavoriteBid(genericListFilter(ctx, &filter, nil), &bids.GetListFavoriteBidRequest{
 		UserId: request.UserId,
 	})
 }
@@ -106,4 +99,61 @@ func (s *service) PostAnalysis(ctx context.Context, request *model.AnalysisReque
 		Base64:    request.Base64,
 		ProcessId: request.ProcessID,
 	})
+}
+
+func (s *service) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
+	user, _ := decode.GetFromContext[*client.AuthClientResponse](ctx, keys.ClientContext)
+
+	request.UserId = user.Id
+
+	return s.bids.PostHoldingBid(ctx, &bids.PostHoldingBidRequest{
+		UserId:                request.UserId,
+		Sequence:              request.Sequence,
+		ProcessId:             request.ProcessId,
+		AppealDeadline:        request.AppealDeadline,
+		ClarificationDeadline: request.ClarificationDeadline,
+		ContractEndDate:       request.ContractEndDate,
+		Origin:                request.Origin,
+		ContractSignDate:      request.ContractSignDate,
+		ContractStartDate:     request.ContractStartDate,
+		DisputeDate:           request.DisputeDate,
+		HomologationDate:      request.HomologationDate,
+		ProposalOpeningDate:   request.ProposalOpeningDate,
+		ProposalClosingDate:   request.ProposalClosingDate,
+		PublicationDate:       request.PublicationDate,
+	})
+}
+
+func (s *service) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+	filter, _ := decode.GetFromContext[query.Filter](ctx, "filter")
+	user, _ := decode.GetFromContext[*client.AuthClientResponse](ctx, keys.ClientContext)
+
+	request.UserId = user.Id
+
+	return s.bids.GetListHoldingBid(genericListFilter(ctx, &filter, nil), &bids.GetListHoldingBidRequest{
+		UserId: request.UserId,
+	})
+}
+
+func genericListFilter(ctx context.Context, filter *query.Filter, enrich func(ctx context.Context, md metadata.MD) error) context.Context {
+	md := metadata.New(map[string]string{
+		"rows":       strconv.FormatInt(filter.Rows, 10),
+		"page":       strconv.FormatInt(filter.Page, 10),
+		"cursor":     filter.Cursor,
+		"sort":       filter.Sort.Key,
+		"sort-order": filter.Sort.Order,
+		"term":       filter.Term,
+	})
+
+	if enrich != nil {
+		err := enrich(ctx, md) // add new metadata if newer is setted in generic
+
+		if err != nil {
+			return ctx
+		}
+	}
+
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	return ctx
 }

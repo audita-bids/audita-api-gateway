@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/project-pncp/private-kit/pkg/pb/protocols/bids"
 )
 
 type FavoriteBidRequest struct {
@@ -36,6 +38,23 @@ type IntegrationRequest struct {
 	Sequence     int32  `json:"sequence"`
 }
 
+type HoldingRequest struct {
+	ProcessId             string         `json:"process_id"`
+	Sequence              int32          `json:"sequence"`
+	UserId                string         `json:"user_id"`
+	Origin                bids.BidOrigin `json:"origin"`
+	PublicationDate       string         `json:"publication_date"`
+	ProposalOpeningDate   string         `json:"proposal_opening_date"`
+	ProposalClosingDate   string         `json:"proposal_closing_date"`
+	DisputeDate           string         `json:"dispute_date"`
+	HomologationDate      string         `json:"homologation_date"`
+	ContractSignDate      string         `json:"contract_sign_date"`
+	ContractStartDate     string         `json:"contract_start_date"`
+	ContractEndDate       string         `json:"contract_end_date"`
+	ClarificationDeadline string         `json:"clarification_deadline"`
+	AppealDeadline        string         `json:"appeal_deadline"`
+}
+
 func (f *FavoriteBidRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(f)
 }
@@ -46,4 +65,8 @@ func (i *IntegrationRequest) Decode(r *http.Request) error {
 
 func (a *AnalysisRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(a)
+}
+
+func (h *HoldingRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(h)
 }

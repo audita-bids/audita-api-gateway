@@ -77,7 +77,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 					})
 				},
 				func(ctx context.Context, r *http.Request) context.Context {
-					return decodeQueryFilterToContext(ctx, r)
+					return decode.DecodeQueryFilterToContext(ctx, r, nil)
 				},
 			),
 		))
@@ -116,6 +116,50 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 							Value:  r.Header.Get("Authorization"),
 						},
 					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPost).
+		Path("/holding-bid").
+		Handler(httptransport.NewServer(
+			endpoint.PostHoldingBid,
+			decodeHoldingHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, nil)
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/holding-bids").
+		Handler(httptransport.NewServer(
+			endpoint.GetListHoldingBid,
+			decodeGetListHoldingBidHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, enrichListHoldingBidFilter)
 				},
 			),
 		))
@@ -181,6 +225,11 @@ func decodeGetListFavoriteBidHTTP(ctx context.Context, r *http.Request) (request
 	return &req, nil
 }
 
+func decodeGetListHoldingBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.HoldingRequest
+	return &req, nil
+}
+
 func decodePostFavoriteBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.FavoriteBidRequest
 	err = req.Decode(r)
@@ -203,39 +252,15 @@ func decodeAnalysisHTTP(ctx context.Context, r *http.Request) (request interface
 	return &req, nil
 }
 
-func decodeQueryFilterToContext(ctx context.Context, r *http.Request) context.Context {
-	q := r.URL.Query()
+func decodeHoldingHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.HoldingRequest
+	err = req.Decode(r)
 
-	filter := query.Filter{
-		Rows: 10,
-		Page: 1,
-	}
-
-	if v := q.Get("rows"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			filter.Rows = n
-		}
-	}
-	if v := q.Get("page"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			filter.Page = n
-		}
-	}
-	if v := q.Get("cursor"); v != "" {
-		filter.Cursor = v
-	}
-	if v := q.Get("sort"); v != "" {
-		filter.Sort.Key = v
-		filter.Sort.Order = q.Get("sort_order")
-		if filter.Sort.Order == "" {
-			filter.Sort.Order = "asc"
-		}
-	}
-	if v := q.Get("term"); v != "" {
-		filter.Term = v
+	if err != nil {
+		return nil, err
 	}
 
-	return decode.InjectIntoContext(ctx, "filter", filter)
+	return &req, nil
 }
 
 func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
@@ -260,6 +285,58 @@ func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response int
 func writeError(w http.ResponseWriter, httpErr *apperrors.HTTPError) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpErr.Status)
+
 	if err := json.NewEncoder(w).Encode(httpErr); err != nil {
+	}
+}
+
+// enriches
+func enrichListHoldingBidFilter(ctx context.Context, r *http.Request, filter *query.Filter) {
+	q := r.URL.Query()
+
+	matchFields := []string{
+		"process_id",
+		"origin",
+	}
+
+	for _, field := range matchFields {
+		if value, ok := decode.RetrieveQueryValue(q, field); ok {
+			filter.Matches = append(filter.Matches, query.Match{
+				Key:   field,
+				Op:    "eq",
+				Value: value,
+			})
+		}
+	}
+
+	dateFields := []string{
+		"dispute_date",
+		"publication_date",
+		"proposal_opening_date",
+		"proposal_closing_date",
+		"homologation_date",
+		"contract_sign_date",
+		"contract_start_date",
+		"contract_end_date",
+		"clarification_deadline",
+		"appeal_deadline",
+	}
+
+	for _, field := range dateFields {
+		if startValue, ok := decode.RetrieveQueryValue(q, field+"_start"); ok {
+			filter.Matches = append(filter.Matches, query.Match{
+				Key:   field,
+				Op:    "gte",
+				Value: startValue,
+			})
+		}
+
+		if endValue, ok := decode.RetrieveQueryValue(q, field+"_end"); ok {
+			filter.Matches = append(filter.Matches, query.Match{
+				Key:   field,
+				Op:    "lte",
+				Value: endValue,
+			})
+		}
 	}
 }

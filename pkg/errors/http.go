@@ -10,16 +10,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type FieldError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-}
-
 type HTTPError struct {
-	Status  int          `json:"-"`
-	Code    string       `json:"code,omitempty"`
-	Message string       `json:"message"`
-	Fields  []FieldError `json:"fields,omitempty"`
+	Status  int    `json:"-"`
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message"`
 }
 
 func (e *HTTPError) Error() string {
@@ -71,25 +65,13 @@ func FromGRPC(err error) *HTTPError {
 	// Override status based on message content for Unknown/Internal errors
 	if code == codes.Unknown || code == codes.Internal {
 		switch {
-		case containsAny(msgLower, []string{"already exists", "already registered", "duplicate entry", "email já cadastrado", "email already exists"}):
-			return &HTTPError{
-				Status:  http.StatusConflict,
-				Code:    "already_exists",
-				Message: message,
-			}
-		case containsAny(msgLower, []string{"invalid email", "email inválido", "invalid format"}):
-			return &HTTPError{
-				Status:  http.StatusBadRequest,
-				Code:    "invalid_email",
-				Message: message,
-			}
-		case containsAny(msgLower, []string{"not found", "não encontrado", "does not exist"}):
+		case containsAny(msgLower, []string{"not found", "does not exist"}):
 			return &HTTPError{
 				Status:  http.StatusNotFound,
 				Code:    "not_found",
 				Message: message,
 			}
-		case containsAny(msgLower, []string{"unauthorized", "não autorizado", "invalid credentials"}):
+		case containsAny(msgLower, []string{"unauthorized", "invalid credentials"}):
 			return &HTTPError{
 				Status:  http.StatusUnauthorized,
 				Code:    "unauthorized",
@@ -125,15 +107,10 @@ func ParseError(err error) *HTTPError {
 
 	var svcErr *decode.SvcError
 	if errors.As(err, &svcErr) {
-		fields := make([]FieldError, len(svcErr.Fields))
-		for i, f := range svcErr.Fields {
-			fields[i] = FieldError{Field: f.Field, Message: f.Message}
-		}
 		return &HTTPError{
 			Status:  svcErr.Code,
 			Code:    "validation_error",
 			Message: svcErr.Message,
-			Fields:  fields,
 		}
 	}
 
@@ -143,18 +120,6 @@ func ParseError(err error) *HTTPError {
 
 	msg := strings.ToLower(err.Error())
 	switch {
-	case containsAny(msg, []string{"already exists", "already registered", "duplicate", "invalid email"}):
-		return &HTTPError{
-			Status:  http.StatusBadRequest,
-			Code:    "already_exists",
-			Message: "Resource already exists",
-		}
-	case containsAny(msg, []string{"invalid email"}):
-		return &HTTPError{
-			Status:  http.StatusBadRequest,
-			Code:    "invalid_email",
-			Message: "Invalid email address",
-		}
 	case containsAny(msg, []string{"not found"}):
 		return &HTTPError{
 			Status:  http.StatusNotFound,
@@ -167,12 +132,18 @@ func ParseError(err error) *HTTPError {
 			Code:    "unauthorized",
 			Message: "Unauthorized",
 		}
+	case containsAny(msg, []string{"insufficient"}):
+		return &HTTPError{
+			Status:  http.StatusUnauthorized,
+			Code:    "insufficient_scopes",
+			Message: "Insufficient scopes",
+		}
 	}
 
 	return &HTTPError{
 		Status:  http.StatusInternalServerError,
 		Code:    "internal_error",
-		Message: "Internal server error",
+		Message: msg,
 	}
 }
 

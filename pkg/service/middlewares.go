@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"contracts/request"
-	"fmt"
 
 	"github.com/Oudwins/zog"
 	"github.com/go-kit/log"
@@ -76,6 +75,24 @@ func (mw *loggingMiddleware) PostAnalysis(ctx context.Context, request *model.An
 	return mw.next.PostAnalysis(ctx, request)
 }
 
+func (mw *loggingMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostHoldingBid", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostHoldingBid", "status", "started")
+	return mw.next.PostHoldingBid(ctx, request)
+}
+
+func (mw *loggingMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetListHoldingBid", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetListHoldingBid", "status", "started")
+	return mw.next.GetListHoldingBid(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -139,6 +156,26 @@ func (mw *recoveryMiddleware) PostAnalysis(ctx context.Context, request *model.A
 	return mw.next.PostAnalysis(ctx, request)
 }
 
+func (mw *recoveryMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostHoldingBid", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.PostHoldingBid(ctx, request)
+}
+
+func (mw *recoveryMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetListHoldingBid", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetListHoldingBid(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -198,11 +235,44 @@ func (mw *validationMiddleware) PostAnalysis(ctx context.Context, request *model
 	})
 
 	if err := schema.Validate(request); err != nil {
-		fmt.Println(err)
 		return nil, decode.ErrorFields(err)
 	}
 
 	return mw.next.PostAnalysis(ctx, request)
+}
+
+func (mw *validationMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"process_id": zog.String().Required(zog.Message("Process ID is required")),
+		"sequence":   zog.Int32().Required(zog.Message("Sequence is required")),
+		"origin": zog.Int32().OneOf(
+			[]int32{
+				int32(bids.BidOrigin_BLL),
+				int32(bids.BidOrigin_PNCP),
+			},
+			zog.Message("Invalid origin value"),
+		).Required(zog.Message("Origin is required")),
+		"publication_date":       zog.String().Optional(),
+		"proposal_opening_date":  zog.String().Optional(),
+		"proposal_closing_date":  zog.String().Optional(),
+		"dispute_date":           zog.String().Optional(),
+		"homologation_date":      zog.String().Optional(),
+		"contract_sign_date":     zog.String().Optional(),
+		"contract_start_date":    zog.String().Optional(),
+		"contract_end_date":      zog.String().Optional(),
+		"clarification_deadline": zog.String().Optional(),
+		"appeal_deadline":        zog.String().Optional(),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PostHoldingBid(ctx, request)
+}
+
+func (mw *validationMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+	return mw.next.GetListHoldingBid(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -299,4 +369,36 @@ func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *m
 	}
 
 	return mw.next.PostAnalysis(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"hold_bids:write"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostHoldingBid(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"hold_bids:read"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetListHoldingBid(ctx, request)
 }
