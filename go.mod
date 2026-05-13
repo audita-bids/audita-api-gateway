@@ -8,7 +8,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1
 	github.com/oklog/run v1.2.0
-	github.com/project-pncp/private-kit v0.0.27
+	github.com/project-pncp/private-kit v0.0.29
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.3
 	google.golang.org/grpc v1.79.3
 )

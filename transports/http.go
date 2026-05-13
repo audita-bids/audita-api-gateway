@@ -183,6 +183,10 @@ func getAvailableLicensesDecodeHTTPRequest(ctx context.Context, r *http.Request)
 		req.CodigoModalidadeContratacao = v
 	}
 
+	if v := q.Get("uf"); v != "" {
+		req.Uf = v
+	}
+
 	if v := q.Get("page"); v != "" {
 		parsed, err := strconv.ParseInt(v, 10, 32)
 		if err != nil {
