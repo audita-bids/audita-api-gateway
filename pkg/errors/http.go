@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/project-pncp/private-kit/decode"
+	"github.com/newdesksoftwares/private-kit/decode"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

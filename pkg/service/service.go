@@ -1,19 +1,19 @@
 package service
 
 import (
+	"audita-api-gateway/request"
 	"context"
-	"contracts/request"
 	"strconv"
 
 	"github.com/go-kit/log"
-	"github.com/project-pncp/private-kit/connectors"
-	"github.com/project-pncp/private-kit/decode"
-	"github.com/project-pncp/private-kit/keys"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/agents"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/bids"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
-	"github.com/project-pncp/private-kit/query"
+	"github.com/newdesksoftwares/private-kit/connectors"
+	"github.com/newdesksoftwares/private-kit/decode"
+	"github.com/newdesksoftwares/private-kit/keys"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
+	"github.com/newdesksoftwares/private-kit/query"
 	"google.golang.org/grpc/metadata"
 )
 

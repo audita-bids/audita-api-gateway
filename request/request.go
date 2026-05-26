@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/bids"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 )
 
 type FavoriteBidRequest struct {

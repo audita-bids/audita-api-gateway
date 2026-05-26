@@ -1,24 +1,24 @@
 package transports
 
 import (
+	"audita-api-gateway/pkg/endpoint"
+	model "audita-api-gateway/request"
 	"context"
-	"contracts/pkg/endpoint"
-	model "contracts/request"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 
-	apperrors "contracts/pkg/errors"
+	apperrors "audita-api-gateway/pkg/errors"
 
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
-	"github.com/project-pncp/private-kit/decode"
-	"github.com/project-pncp/private-kit/keys"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
-	"github.com/project-pncp/private-kit/query"
+	"github.com/newdesksoftwares/private-kit/decode"
+	"github.com/newdesksoftwares/private-kit/keys"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
+	"github.com/newdesksoftwares/private-kit/query"
 	"go.elastic.co/apm/module/apmgorilla/v2"
 )
 

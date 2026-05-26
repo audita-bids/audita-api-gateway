@@ -1,17 +1,17 @@
 package service
 
 import (
+	"audita-api-gateway/request"
 	"context"
-	"contracts/request"
 
 	"github.com/Oudwins/zog"
 	"github.com/go-kit/log"
-	"github.com/project-pncp/private-kit/decode"
-	"github.com/project-pncp/private-kit/middlewares"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/agents"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/bids"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/client"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
+	"github.com/newdesksoftwares/private-kit/decode"
+	"github.com/newdesksoftwares/private-kit/middlewares"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 )
 
 type Middleware func(Service) Service

@@ -1,14 +1,14 @@
 package endpoint
 
 import (
+	"audita-api-gateway/pkg/service"
+	"audita-api-gateway/request"
 	"context"
-	"contracts/pkg/service"
-	"contracts/request"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/log"
-	"github.com/project-pncp/private-kit/middlewares"
-	"github.com/project-pncp/private-kit/pkg/pb/protocols/pncp"
+	"github.com/newdesksoftwares/private-kit/middlewares"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 )
 
 type EndpointSetup struct {
