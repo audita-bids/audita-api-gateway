@@ -19,6 +19,9 @@ type EndpointSetup struct {
 	PostAnalysis         endpoint.Endpoint
 	PostHoldingBid       endpoint.Endpoint
 	GetListHoldingBid    endpoint.Endpoint
+	PostWhitelabel       endpoint.Endpoint
+	GetWhitelabel        endpoint.Endpoint
+	UpdateWhitelabel     endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -29,6 +32,9 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PostAnalysis endpoint.Endpoint
 	var PostHoldingBid endpoint.Endpoint
 	var GetListHoldingBid endpoint.Endpoint
+	var PostWhitelabel endpoint.Endpoint
+	var GetWhitelabel endpoint.Endpoint
+	var UpdateWhitelabel endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "contracts")
 	metricsMiddleware := middlewares.MetricsMiddleware("contracts")
@@ -61,6 +67,18 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListHoldingBid = MakeGetListHoldingBidEndpoint(s)
 		GetListHoldingBid = loggingMiddleware("GetListHoldingBid")(GetListHoldingBid)
 		GetListHoldingBid = metricsMiddleware("GetListHoldingBid")(GetListHoldingBid)
+
+		PostWhitelabel = MakePostWhitelabelEndpoint(s)
+		PostWhitelabel = loggingMiddleware("PostWhitelabel")(PostWhitelabel)
+		PostWhitelabel = metricsMiddleware("PostWhitelabel")(PostWhitelabel)
+
+		GetWhitelabel = MakeGetWhitelabelEndpoint(s)
+		GetWhitelabel = loggingMiddleware("GetWhitelabel")(GetWhitelabel)
+		GetWhitelabel = metricsMiddleware("GetWhitelabel")(GetWhitelabel)
+
+		UpdateWhitelabel = MakeUpdateWhitelabelEndpoint(s)
+		UpdateWhitelabel = loggingMiddleware("UpdateWhitelabel")(UpdateWhitelabel)
+		UpdateWhitelabel = metricsMiddleware("UpdateWhitelabel")(UpdateWhitelabel)
 	}
 
 	return &EndpointSetup{
@@ -71,6 +89,9 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostAnalysis:         PostAnalysis,
 		PostHoldingBid:       PostHoldingBid,
 		GetListHoldingBid:    GetListHoldingBid,
+		PostWhitelabel:       PostWhitelabel,
+		GetWhitelabel:        GetWhitelabel,
+		UpdateWhitelabel:     UpdateWhitelabel,
 	}
 }
 
@@ -198,6 +219,54 @@ func MakeGetListHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
 		return &Resp{
 			Items: fc,
 		}, nil
+	}
+}
+
+func MakeGetWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.WhitelabelRequest)
+
+		fc, err := s.GetWhitelabel(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.WhitelabelRequest)
+
+		fc, err := s.PostWhitelabel(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeUpdateWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.WhitelabelRequest)
+
+		fc, err := s.UpdateWhitelabel(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
 	}
 }
 

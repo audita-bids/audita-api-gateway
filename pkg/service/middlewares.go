@@ -12,6 +12,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 )
 
 type Middleware func(Service) Service
@@ -91,6 +92,33 @@ func (mw *loggingMiddleware) GetListHoldingBid(ctx context.Context, request *mod
 
 	mw.logger.Log("method", "GetListHoldingBid", "status", "started")
 	return mw.next.GetListHoldingBid(ctx, request)
+}
+
+func (mw *loggingMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostWhitelabel", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostWhitelabel", "status", "started")
+	return mw.next.PostWhitelabel(ctx, request)
+}
+
+func (mw *loggingMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "GetWhitelabel", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetWhitelabel", "status", "started")
+	return mw.next.GetWhitelabel(ctx, request)
+}
+
+func (mw *loggingMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "UpdateWhitelabel", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "UpdateWhitelabel", "status", "started")
+	return mw.next.UpdateWhitelabel(ctx, request)
 }
 
 func RecoveryMiddleware(logger log.Logger) Middleware {
@@ -174,6 +202,36 @@ func (mw *recoveryMiddleware) GetListHoldingBid(ctx context.Context, request *mo
 	}()
 
 	return mw.next.GetListHoldingBid(ctx, request)
+}
+
+func (mw *recoveryMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostWhitelabel", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.PostWhitelabel(ctx, request)
+}
+
+func (mw *recoveryMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetWhitelabel", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetWhitelabel(ctx, request)
+}
+
+func (mw *recoveryMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "UpdateWhitelabel", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.UpdateWhitelabel(ctx, request)
 }
 
 type validationMiddleware struct {
@@ -273,6 +331,43 @@ func (mw *validationMiddleware) PostHoldingBid(ctx context.Context, request *mod
 
 func (mw *validationMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
 	return mw.next.GetListHoldingBid(ctx, request)
+}
+
+func (mw *validationMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"id":       zog.String().Required(zog.Message("ID is required")),
+		"owner_id": zog.String().Required(zog.Message("Owner ID is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PostWhitelabel(ctx, request)
+}
+
+func (mw *validationMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"owner_id": zog.String().Required(zog.Message("ID is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.GetWhitelabel(ctx, request)
+}
+
+func (mw *validationMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"id": zog.String().Required(zog.Message("ID is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.UpdateWhitelabel(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -401,4 +496,52 @@ func (mw *authenticationMiddleware) GetListHoldingBid(ctx context.Context, reque
 	}
 
 	return mw.next.GetListHoldingBid(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"whitelabel:write"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostWhitelabel(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"whitelabel:read"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetWhitelabel(ctx, request)
+}
+
+func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, []string{"whitelabel:write"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.UpdateWhitelabel(ctx, request)
 }

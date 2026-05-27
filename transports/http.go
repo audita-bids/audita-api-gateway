@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -164,6 +165,63 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodPost).
+		Path("/whitelabel").
+		Handler(httptransport.NewServer(
+			endpoint.PostWhitelabel,
+			decodeWhitelabelHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPatch).
+		Path("/whitelabel").
+		Handler(httptransport.NewServer(
+			endpoint.UpdateWhitelabel,
+			decodeWhitelabelUpdateHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/whitelabel").
+		Handler(httptransport.NewServer(
+			endpoint.GetWhitelabel,
+			decodeWhitelabelHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	return r
 }
 
@@ -262,6 +320,49 @@ func decodeHoldingHTTP(ctx context.Context, r *http.Request) (request interface{
 
 	if err != nil {
 		return nil, err
+	}
+
+	return &req, nil
+}
+
+func decodeWhitelabelHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.WhitelabelRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.WhitelabelRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
+
+	files := map[string]*io.Reader{
+		"logoImage":       &req.LogoImage,
+		"mobileLogoImage": &req.MobileLogoImage,
+		"backgroundImage": &req.BackgroundImage,
+	}
+
+	if err := r.ParseMultipartForm(12 << 20); err != nil {
+		return nil, err
+	}
+
+	for key, target := range files {
+		file, _, err := r.FormFile(key)
+		if err != nil {
+			return nil, err
+		}
+
+		if file != nil && target != nil {
+			*target = file
+		}
 	}
 
 	return &req, nil
