@@ -3,6 +3,7 @@ package service
 import (
 	"audita-api-gateway/request"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -32,6 +33,7 @@ type Service interface {
 	PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
 	GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
 	UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
+	GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error)
 }
 
 type service struct {
@@ -119,20 +121,8 @@ func (s *service) PostHoldingBid(ctx context.Context, request *model.HoldingRequ
 	request.UserId = user.Id
 
 	return s.bids.PostHoldingBid(ctx, &bids.PostHoldingBidRequest{
-		UserId:                request.UserId,
-		Sequence:              request.Sequence,
-		ProcessId:             request.ProcessId,
-		AppealDeadline:        request.AppealDeadline,
-		ClarificationDeadline: request.ClarificationDeadline,
-		ContractEndDate:       request.ContractEndDate,
-		Origin:                request.Origin,
-		ContractSignDate:      request.ContractSignDate,
-		ContractStartDate:     request.ContractStartDate,
-		DisputeDate:           request.DisputeDate,
-		HomologationDate:      request.HomologationDate,
-		ProposalOpeningDate:   request.ProposalOpeningDate,
-		ProposalClosingDate:   request.ProposalClosingDate,
-		PublicationDate:       request.PublicationDate,
+		UserId: request.UserId,
+		BidId:  request.BidId,
 	})
 }
 
@@ -221,6 +211,12 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 	})
 }
 
+func (s *service) GetBids(ctx context.Context, _ *model.BidRequest) (*bids.GetListBidsResponse, error) {
+	filter, _ := decode.GetFromContext[query.Filter](ctx, "filter")
+
+	return s.bids.GetListBids(genericListFilter(ctx, &filter, nil), &bids.GetListBidsRequest{})
+}
+
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {
 	var resp model.CdnResponse
 
@@ -249,6 +245,12 @@ func genericListFilter(ctx context.Context, filter *query.Filter, enrich func(ct
 		"sort-order": filter.Sort.Order,
 		"term":       filter.Term,
 	})
+
+	for i, m := range filter.Matches {
+		md.Set(fmt.Sprintf("filters-%d-key", i), m.Key)
+		md.Set(fmt.Sprintf("filters-%d-op", i), m.Op)
+		md.Set(fmt.Sprintf("filters-%d-value", i), fmt.Sprintf("%v", m.Value))
+	}
 
 	if enrich != nil {
 		err := enrich(ctx, md) // add new metadata if newer is setted in generic

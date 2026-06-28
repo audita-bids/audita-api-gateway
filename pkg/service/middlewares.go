@@ -3,6 +3,7 @@ package service
 import (
 	"audita-api-gateway/request"
 	"context"
+	"fmt"
 
 	"github.com/Oudwins/zog"
 	"github.com/go-kit/log"
@@ -121,6 +122,15 @@ func (mw *loggingMiddleware) UpdateWhitelabel(ctx context.Context, request *mode
 	return mw.next.UpdateWhitelabel(ctx, request)
 }
 
+func (mw *loggingMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetBids", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetBids", "status", "started")
+	return mw.next.GetBids(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -232,6 +242,16 @@ func (mw *recoveryMiddleware) UpdateWhitelabel(ctx context.Context, request *mod
 	}()
 
 	return mw.next.UpdateWhitelabel(ctx, request)
+}
+
+func (mw *recoveryMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetBids", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetBids(ctx, request)
 }
 
 type validationMiddleware struct {
@@ -370,6 +390,10 @@ func (mw *validationMiddleware) UpdateWhitelabel(ctx context.Context, request *m
 	return mw.next.UpdateWhitelabel(ctx, request)
 }
 
+func (mw *validationMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
+	return mw.next.GetBids(ctx, request)
+}
+
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
 	return func(next Service) Service {
 		return &authenticationMiddleware{
@@ -393,7 +417,9 @@ func (mw *authenticationMiddleware) GetAvailableLicenses(ctx context.Context, re
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"licenses:read"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"licenses:read"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -409,7 +435,9 @@ func (mw *authenticationMiddleware) GetLicense(ctx context.Context, request *pnc
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"licenses:read"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"licenses:read"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -425,7 +453,9 @@ func (mw *authenticationMiddleware) PostFavoriteBid(ctx context.Context, request
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"bids:write"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:write"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -441,7 +471,9 @@ func (mw *authenticationMiddleware) GetListFavoriteBid(ctx context.Context, requ
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"bids:read"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:read"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -457,12 +489,13 @@ func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *m
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"ai:write"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"ai:write"},
+	})
 
 	if err != nil {
 		return nil, err
 	}
-
 	return mw.next.PostAnalysis(ctx, request)
 }
 
@@ -473,7 +506,11 @@ func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request 
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"hold_bids:write"})
+	fmt.Println(user)
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"hold_bids:write"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -489,7 +526,9 @@ func (mw *authenticationMiddleware) GetListHoldingBid(ctx context.Context, reque
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"hold_bids:read"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"hold_bids:read"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -505,7 +544,9 @@ func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request 
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"whitelabel:write"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"whitelabel:write"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -521,7 +562,9 @@ func (mw *authenticationMiddleware) GetWhitelabel(ctx context.Context, request *
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"whitelabel:read"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"whitelabel:read"},
+	})
 
 	if err != nil {
 		return nil, err
@@ -537,11 +580,31 @@ func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, reques
 		return nil, err
 	}
 
-	err = middlewares.ValidateScopes(user, []string{"whitelabel:write"})
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"whitelabel:write"},
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
 	return mw.next.UpdateWhitelabel(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:read"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetBids(ctx, request)
 }

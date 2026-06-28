@@ -36,6 +36,21 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	f := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+
 	var g run.Group
 	{
 		httpListener, err := net.Listen("tcp", cfg.HttpAddr)
@@ -48,7 +63,7 @@ func main() {
 			strip := http.StripPrefix("/api", httpHandler)
 
 			httpServer = &httpCaller.Server{
-				Handler: strip,
+				Handler: f(strip),
 			}
 
 			return httpServer.Serve(httpListener)

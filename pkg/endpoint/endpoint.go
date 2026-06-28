@@ -22,6 +22,7 @@ type EndpointSetup struct {
 	PostWhitelabel       endpoint.Endpoint
 	GetWhitelabel        endpoint.Endpoint
 	UpdateWhitelabel     endpoint.Endpoint
+	GetBids              endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -35,9 +36,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PostWhitelabel endpoint.Endpoint
 	var GetWhitelabel endpoint.Endpoint
 	var UpdateWhitelabel endpoint.Endpoint
+	var GetBids endpoint.Endpoint
 
-	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "contracts")
-	metricsMiddleware := middlewares.MetricsMiddleware("contracts")
+	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
+	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
 
 	{
 		GetAvailableLicenses = MakeGetAvailableLicensesEndpoint(s)
@@ -79,6 +81,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		UpdateWhitelabel = MakeUpdateWhitelabelEndpoint(s)
 		UpdateWhitelabel = loggingMiddleware("UpdateWhitelabel")(UpdateWhitelabel)
 		UpdateWhitelabel = metricsMiddleware("UpdateWhitelabel")(UpdateWhitelabel)
+
+		GetBids = MakeGetBidsEndpoint(s)
+		GetBids = loggingMiddleware("GetBids")(GetBids)
+		GetBids = metricsMiddleware("GetBids")(GetBids)
 	}
 
 	return &EndpointSetup{
@@ -92,6 +98,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostWhitelabel:       PostWhitelabel,
 		GetWhitelabel:        GetWhitelabel,
 		UpdateWhitelabel:     UpdateWhitelabel,
+		GetBids:              GetBids,
 	}
 }
 
@@ -105,6 +112,7 @@ func MakeGetAvailableLicensesEndpoint(s service.Service) endpoint.Endpoint {
 			CodigoModalidadeContratacao: r.CodigoModalidadeContratacao,
 			Pagina:                      r.Pagina,
 			TamanhoPagina:               r.TamanhoPagina,
+			Uf:                          r.Uf,
 		}
 
 		fc, err := s.GetAvailableLicenses(ctx, rpcRequest)
@@ -267,6 +275,24 @@ func MakeUpdateWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		}
 
 		return fc, nil
+	}
+}
+
+func MakeGetBidsEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.BidRequest)
+
+		fc, err := s.GetBids(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return &Resp{
+			Items: fc,
+		}, nil
 	}
 }
 

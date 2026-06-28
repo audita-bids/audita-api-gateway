@@ -7,10 +7,11 @@ require (
 	github.com/go-kit/kit v0.13.0
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1
-	github.com/newdesksoftwares/private-kit v0.0.37
+	github.com/newdesksoftwares/private-kit v0.0.66
 	github.com/oklog/run v1.2.0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.3
 	google.golang.org/grpc v1.79.3
+	resty.dev/v3 v3.0.0-beta.6
 )
 
 require (
@@ -43,5 +44,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	howett.net/plist v1.0.1 // indirect
-	resty.dev/v3 v3.0.0-beta.6 // indirect
 )

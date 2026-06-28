@@ -21,6 +21,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/query"
 	"go.elastic.co/apm/module/apmgorilla/v2"
+	"google.golang.org/grpc/metadata"
 )
 
 func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Handler {
@@ -219,6 +220,31 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 						},
 					})
 				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, enrichListHoldingBidFilter)
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/bids").
+		Handler(httptransport.NewServer(
+			endpoint.GetBids,
+			decodeGetListBidsHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, enrichListBidFilter)
+				},
 			),
 		))
 
@@ -368,6 +394,12 @@ func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request i
 	return &req, nil
 }
 
+func decodeGetListBidsHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.BidRequest
+
+	return &req, nil
+}
+
 func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
 	if resp, ok := response.(*endpoint.Resp); ok {
 		if resp.Error != nil {
@@ -444,4 +476,61 @@ func enrichListHoldingBidFilter(ctx context.Context, r *http.Request, filter *qu
 			})
 		}
 	}
+}
+
+func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Filter) {
+	q := r.URL.Query()
+
+	if value, ok := decode.RetrieveQueryValue(q, "modalities"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "modality",
+			Op:    "in",
+			Value: value,
+		})
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "sphere"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "sphere",
+			Op:    "eq",
+			Value: value,
+		})
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "term"); ok {
+		ctx = metadata.AppendToOutgoingContext(ctx, "term", value)
+	}
+
+	valueRanged := []string{
+		"min_value",
+		"max_value",
+	}
+
+	for _, field := range valueRanged {
+		if startValue, ok := decode.RetrieveQueryValue(q, field); ok {
+			filter.Matches = append(filter.Matches, query.Match{
+				Key:   field,
+				Op:    "gte",
+				Value: startValue,
+			})
+		}
+
+		if endValue, ok := decode.RetrieveQueryValue(q, field); ok {
+			filter.Matches = append(filter.Matches, query.Match{
+				Key:   field,
+				Op:    "lte",
+				Value: endValue,
+			})
+		}
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "status"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "status",
+			Op:    "eq",
+			Value: value,
+		})
+	}
+
+	fmt.Println("filter", filter)
 }

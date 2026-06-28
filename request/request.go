@@ -41,20 +41,9 @@ type IntegrationRequest struct {
 }
 
 type HoldingRequest struct {
-	ProcessId             string         `json:"process_id"`
-	Sequence              int32          `json:"sequence"`
-	UserId                string         `json:"user_id"`
-	Origin                bids.BidOrigin `json:"origin"`
-	PublicationDate       string         `json:"publication_date"`
-	ProposalOpeningDate   string         `json:"proposal_opening_date"`
-	ProposalClosingDate   string         `json:"proposal_closing_date"`
-	DisputeDate           string         `json:"dispute_date"`
-	HomologationDate      string         `json:"homologation_date"`
-	ContractSignDate      string         `json:"contract_sign_date"`
-	ContractStartDate     string         `json:"contract_start_date"`
-	ContractEndDate       string         `json:"contract_end_date"`
-	ClarificationDeadline string         `json:"clarification_deadline"`
-	AppealDeadline        string         `json:"appeal_deadline"`
+	UserId string         `json:"user_id"`
+	BidId  string         `json:"bid_id"`
+	Origin bids.BidOrigin `json:"origin"`
 }
 
 type WhitelabelRequest struct {
@@ -83,6 +72,9 @@ type WhitelabelRequest struct {
 	LogoImage       io.Reader `json:"logo_image"`
 	MobileLogoImage io.Reader `json:"mobile_logo_image"`
 	BackgroundImage io.Reader `json:"background_image"`
+}
+
+type BidRequest struct {
 }
 
 type CdnResponse struct {
