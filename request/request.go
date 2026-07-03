@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -41,14 +42,15 @@ type IntegrationRequest struct {
 }
 
 type HoldingRequest struct {
-	UserId string         `json:"user_id"`
-	BidId  string         `json:"bid_id"`
-	Origin bids.BidOrigin `json:"origin"`
+	UserId           string         `json:"user_id"`
+	BidId            string         `json:"bid_id"`
+	PublicationMonth int32          `json:"publication_month"`
+	Origin           bids.BidOrigin `json:"origin"`
 }
 
 type WhitelabelRequest struct {
 	Id            string           `json:"id"`
-	OwnerId       string           `json:"owner_id"`
+	ManagerId     string           `json:"manager_id"`
 	CompanyName   string           `json:"company_name"`
 	LogoUri       string           `json:"logo_uri"`
 	MobileLogoUri string           `json:"mobile_logo_uri"`
@@ -75,6 +77,7 @@ type WhitelabelRequest struct {
 }
 
 type BidRequest struct {
+	Id string
 }
 
 type CdnResponse struct {
@@ -97,8 +100,17 @@ func (h *HoldingRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(h)
 }
 
+// Decode reads JSON text fields when present. The GET handler sends no body and
+// the PATCH handler carries a multipart form (parsed in its HTTP decoder), so an
+// empty/EOF body is not an error here.
 func (w *WhitelabelRequest) Decode(r *http.Request) error {
-	return json.NewDecoder(r.Body).Decode(w)
+	if r.Body == nil {
+		return nil
+	}
+	if err := json.NewDecoder(r.Body).Decode(w); err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+	return nil
 }
 
 func (c *CdnResponse) Decode(r *http.Request) error {

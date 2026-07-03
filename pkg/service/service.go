@@ -34,6 +34,7 @@ type Service interface {
 	GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
 	UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
 	GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error)
+	GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error)
 }
 
 type service struct {
@@ -63,9 +64,9 @@ func NewService(logger log.Logger) Service {
 			whitelabel: whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
+		svc = ValidationMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
 		svc = AuthenticationMiddleware(logger, clients)(svc)
-		//	svc = ValidationMiddleware(logger)(svc)
 	}
 
 	return svc
@@ -98,7 +99,7 @@ func (s *service) GetListFavoriteBid(ctx context.Context, request *model.Favorit
 
 	request.UserId = user.Id
 
-	return s.bids.GetListFavoriteBid(genericListFilter(ctx, &filter, nil), &bids.GetListFavoriteBidRequest{
+	return s.bids.GetListFavoriteBid(genericListFilter(ctx, &filter), &bids.GetListFavoriteBidRequest{
 		UserId: request.UserId,
 	})
 }
@@ -132,29 +133,50 @@ func (s *service) GetListHoldingBid(ctx context.Context, request *model.HoldingR
 
 	request.UserId = user.Id
 
-	return s.bids.GetListHoldingBid(genericListFilter(ctx, &filter, nil), &bids.GetListHoldingBidRequest{
-		UserId: request.UserId,
+	return s.bids.GetListHoldingBid(genericListFilter(ctx, &filter), &bids.GetListHoldingBidRequest{
+		UserId:           request.UserId,
+		PublicationMonth: request.PublicationMonth,
 	})
 }
 
 func (s *service) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
 
-	request.OwnerId = user.Id
+	managerId := user.OwnerId
+
+	if managerId == "" && user.Role == client.ClientRole_Business {
+		managerId = user.Id
+	}
 
 	return s.whitelabel.CreateWhitelabel(ctx, &whitelabel.WhitelabelComplete{
-		Id:      request.Id,
-		OwnerId: request.OwnerId,
+		Id:        request.Id,
+		ManagerId: managerId,
 	})
 }
 
-func (s *service) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+func (s *service) GetWhitelabel(ctx context.Context, _ *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	managerId := user.OwnerId
+
+	if managerId == "" && user.Role == client.ClientRole_Business {
+		managerId = user.Id
+	}
+
 	return s.whitelabel.FindWhitelabel(ctx, &whitelabel.FindWhitelabelRequest{
-		OwnerId: request.OwnerId,
+		ManagerId: managerId,
 	})
 }
 
 func (s *service) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	managerId := user.OwnerId
+
+	if managerId == "" && user.Role == client.ClientRole_Business {
+		managerId = user.Id
+	}
+
 	if request.MobileLogoImage != nil {
 		url, err := s.uploadFile(request.MobileLogoImage, "mobileLogoImage")
 		if err != nil {
@@ -164,6 +186,8 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 		if url != "" {
 			request.MobileLogoUri = url
 		}
+	} else {
+		request.MobileLogoUri = ""
 	}
 
 	if request.LogoImage != nil {
@@ -175,6 +199,8 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 		if url != "" {
 			request.LogoUri = url
 		}
+	} else {
+		request.LogoUri = ""
 	}
 
 	if request.BackgroundImage != nil {
@@ -190,7 +216,7 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 
 	return s.whitelabel.UpdateWhitelabel(ctx, &whitelabel.WhitelabelComplete{
 		Id:              request.Id,
-		OwnerId:         request.OwnerId,
+		ManagerId:       managerId,
 		CompanyName:     request.CompanyName,
 		LogoUri:         request.LogoUri,
 		MobileLogoUri:   request.MobileLogoUri,
@@ -214,14 +240,21 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 func (s *service) GetBids(ctx context.Context, _ *model.BidRequest) (*bids.GetListBidsResponse, error) {
 	filter, _ := decode.GetFromContext[query.Filter](ctx, "filter")
 
-	return s.bids.GetListBids(genericListFilter(ctx, &filter, nil), &bids.GetListBidsRequest{})
+	return s.bids.GetListBids(genericListFilter(ctx, &filter), &bids.GetListBidsRequest{})
+}
+
+func (s *service) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
+	return s.bids.GetBid(ctx, &bids.GetBidRequest{
+		Id: request.Id,
+	})
 }
 
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {
 	var resp model.CdnResponse
 
 	_, err := s.cdnApi.R().
-		SetFileReader(fieldName, fieldName, file).
+		SetFileReader("file", fieldName, file).
+		SetDebug(true).
 		SetResult(&resp).
 		Post("/api/upload")
 
@@ -236,7 +269,7 @@ func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {
 	return resp.URL, nil
 }
 
-func genericListFilter(ctx context.Context, filter *query.Filter, enrich func(ctx context.Context, md metadata.MD) error) context.Context {
+func genericListFilter(ctx context.Context, filter *query.Filter) context.Context {
 	md := metadata.New(map[string]string{
 		"rows":       strconv.FormatInt(filter.Rows, 10),
 		"page":       strconv.FormatInt(filter.Page, 10),
@@ -250,14 +283,6 @@ func genericListFilter(ctx context.Context, filter *query.Filter, enrich func(ct
 		md.Set(fmt.Sprintf("filters-%d-key", i), m.Key)
 		md.Set(fmt.Sprintf("filters-%d-op", i), m.Op)
 		md.Set(fmt.Sprintf("filters-%d-value", i), fmt.Sprintf("%v", m.Value))
-	}
-
-	if enrich != nil {
-		err := enrich(ctx, md) // add new metadata if newer is setted in generic
-
-		if err != nil {
-			return ctx
-		}
 	}
 
 	ctx = metadata.NewOutgoingContext(ctx, md)

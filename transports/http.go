@@ -19,6 +19,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/decode"
 	"github.com/newdesksoftwares/private-kit/keys"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 	"github.com/newdesksoftwares/private-kit/query"
 	"go.elastic.co/apm/module/apmgorilla/v2"
 	"google.golang.org/grpc/metadata"
@@ -230,7 +231,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 		Path("/bids").
 		Handler(httptransport.NewServer(
 			endpoint.GetBids,
-			decodeGetListBidsHTTP,
+			decodeBidHTTP,
 			encodeHttpResponse,
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
@@ -244,6 +245,25 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 				},
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.DecodeQueryFilterToContext(ctx, r, enrichListBidFilter)
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/bids/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.GetBid,
+			decodeGetBidHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
 				},
 			),
 		))
@@ -315,6 +335,18 @@ func decodeGetListFavoriteBidHTTP(ctx context.Context, r *http.Request) (request
 
 func decodeGetListHoldingBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.HoldingRequest
+
+	query := r.URL.Query()
+	if value, ok := decode.RetrieveQueryValue(query, "publication_month"); ok {
+		converted, err := strconv.Atoi(value)
+
+		if err != nil {
+			return nil, nil
+		}
+
+		req.PublicationMonth = int32(converted)
+	}
+
 	return &req, nil
 }
 
@@ -364,29 +396,33 @@ func decodeWhitelabelHTTP(ctx context.Context, r *http.Request) (request interfa
 
 func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.WhitelabelRequest
-	err = req.Decode(r)
-
-	if err != nil {
-		return nil, err
-	}
-
-	files := map[string]*io.Reader{
-		"logoImage":       &req.LogoImage,
-		"mobileLogoImage": &req.MobileLogoImage,
-		"backgroundImage": &req.BackgroundImage,
-	}
 
 	if err := r.ParseMultipartForm(12 << 20); err != nil {
 		return nil, err
 	}
 
-	for key, target := range files {
-		file, _, err := r.FormFile(key)
-		if err != nil {
-			return nil, err
+	// Text fields arrive as multipart form values.
+	req.Id = r.FormValue("id")
+	req.CompanyName = r.FormValue("company_name")
+	req.FontFamily = r.FormValue("font_family")
+	req.PrimaryColor = r.FormValue("primary_color")
+	req.SecondaryColor = r.FormValue("secondary_color")
+	req.AccentColor = r.FormValue("accent_color")
+	if v := r.FormValue("theme"); v != "" {
+		if n, convErr := strconv.Atoi(v); convErr == nil {
+			req.Theme = whitelabel.Theme(n)
 		}
+	}
 
-		if file != nil && target != nil {
+	// Images are optional — only set the ones actually uploaded so an update
+	// that changes just text keeps the stored URIs.
+	files := map[string]*io.Reader{
+		"logoImage":       &req.LogoImage,
+		"mobileLogoImage": &req.MobileLogoImage,
+		"backgroundImage": &req.BackgroundImage,
+	}
+	for key, target := range files {
+		if file, _, ferr := r.FormFile(key); ferr == nil {
 			*target = file
 		}
 	}
@@ -394,8 +430,17 @@ func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request i
 	return &req, nil
 }
 
-func decodeGetListBidsHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+func decodeBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.BidRequest
+
+	return &req, nil
+}
+
+func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.BidRequest
+	vars := mux.Vars(r)
+
+	req.Id = vars["id"]
 
 	return &req, nil
 }
@@ -447,16 +492,8 @@ func enrichListHoldingBidFilter(ctx context.Context, r *http.Request, filter *qu
 	}
 
 	dateFields := []string{
-		"dispute_date",
-		"publication_date",
 		"proposal_opening_date",
 		"proposal_closing_date",
-		"homologation_date",
-		"contract_sign_date",
-		"contract_start_date",
-		"contract_end_date",
-		"clarification_deadline",
-		"appeal_deadline",
 	}
 
 	for _, field := range dateFields {
@@ -493,7 +530,7 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 		filter.Matches = append(filter.Matches, query.Match{
 			Key:   "sphere",
 			Op:    "eq",
-			Value: value,
+			Value: sphereLetterToCode(value),
 		})
 	}
 
@@ -501,36 +538,72 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 		ctx = metadata.AppendToOutgoingContext(ctx, "term", value)
 	}
 
-	valueRanged := []string{
-		"min_value",
-		"max_value",
+	if value, ok := decode.RetrieveQueryValue(q, "min_value"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "estimated_value",
+			Op:    "gte",
+			Value: value,
+		})
 	}
 
-	for _, field := range valueRanged {
-		if startValue, ok := decode.RetrieveQueryValue(q, field); ok {
-			filter.Matches = append(filter.Matches, query.Match{
-				Key:   field,
-				Op:    "gte",
-				Value: startValue,
-			})
-		}
+	if value, ok := decode.RetrieveQueryValue(q, "max_value"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "estimated_value",
+			Op:    "lte",
+			Value: value,
+		})
+	}
 
-		if endValue, ok := decode.RetrieveQueryValue(q, field); ok {
-			filter.Matches = append(filter.Matches, query.Match{
-				Key:   field,
-				Op:    "lte",
-				Value: endValue,
-			})
-		}
+	if value, ok := decode.RetrieveQueryValue(q, "date_start"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "proposal_opening_date",
+			Op:    "gte",
+			Value: value,
+		})
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "date_end"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "proposal_opening_date",
+			Op:    "lte",
+			Value: value,
+		})
 	}
 
 	if value, ok := decode.RetrieveQueryValue(q, "status"); ok {
 		filter.Matches = append(filter.Matches, query.Match{
 			Key:   "status",
+			Op:    "in",
+			Value: value,
+		})
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "uf"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "uf",
 			Op:    "eq",
 			Value: value,
 		})
 	}
 
-	fmt.Println("filter", filter)
+	if value, ok := decode.RetrieveQueryValue(q, "city_ibge"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "city_ibge",
+			Op:    "eq",
+			Value: value,
+		})
+	}
+}
+
+func sphereLetterToCode(letter string) string {
+	switch letter {
+	case "M":
+		return "0"
+	case "E":
+		return "1"
+	case "F":
+		return "2"
+	default:
+		return "3"
+	}
 }

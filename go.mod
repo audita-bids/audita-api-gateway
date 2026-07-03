@@ -7,7 +7,7 @@ require (
 	github.com/go-kit/kit v0.13.0
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1
-	github.com/newdesksoftwares/private-kit v0.0.66
+	github.com/newdesksoftwares/private-kit v1.0.4
 	github.com/oklog/run v1.2.0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.3
 	google.golang.org/grpc v1.79.3
@@ -28,6 +28,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
+	github.com/redis/go-redis/v9 v9.21.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.3 // indirect
 	go.elastic.co/apm/v2 v2.7.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
@@ -37,6 +38,7 @@ require (
 	go.opentelemetry.io/otel v1.40.0 // indirect
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect

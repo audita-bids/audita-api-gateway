@@ -65,11 +65,11 @@ func FromGRPC(err error) *HTTPError {
 	// Override status based on message content for Unknown/Internal errors
 	if code == codes.Unknown || code == codes.Internal {
 		switch {
-		case containsAny(msgLower, []string{"not found", "does not exist"}):
+		case containsAny(msgLower, []string{"not found", "does not exist", "no documents"}):
 			return &HTTPError{
 				Status:  http.StatusNotFound,
 				Code:    "not_found",
-				Message: message,
+				Message: "not found",
 			}
 		case containsAny(msgLower, []string{"unauthorized", "invalid credentials"}):
 			return &HTTPError{

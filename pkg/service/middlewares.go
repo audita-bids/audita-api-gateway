@@ -131,6 +131,15 @@ func (mw *loggingMiddleware) GetBids(ctx context.Context, request *model.BidRequ
 	return mw.next.GetBids(ctx, request)
 }
 
+func (mw *loggingMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "GetBid", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetBid", "status", "started")
+	return mw.next.GetBid(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -254,6 +263,16 @@ func (mw *recoveryMiddleware) GetBids(ctx context.Context, request *model.BidReq
 	return mw.next.GetBids(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetBid", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetBid(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -321,25 +340,7 @@ func (mw *validationMiddleware) PostAnalysis(ctx context.Context, request *model
 
 func (mw *validationMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
 	schema := zog.Struct(zog.Shape{
-		"process_id": zog.String().Required(zog.Message("Process ID is required")),
-		"sequence":   zog.Int32().Required(zog.Message("Sequence is required")),
-		"origin": zog.Int32().OneOf(
-			[]int32{
-				int32(bids.BidOrigin_BLL),
-				int32(bids.BidOrigin_PNCP),
-			},
-			zog.Message("Invalid origin value"),
-		).Required(zog.Message("Origin is required")),
-		"publication_date":       zog.String().Optional(),
-		"proposal_opening_date":  zog.String().Optional(),
-		"proposal_closing_date":  zog.String().Optional(),
-		"dispute_date":           zog.String().Optional(),
-		"homologation_date":      zog.String().Optional(),
-		"contract_sign_date":     zog.String().Optional(),
-		"contract_start_date":    zog.String().Optional(),
-		"contract_end_date":      zog.String().Optional(),
-		"clarification_deadline": zog.String().Optional(),
-		"appeal_deadline":        zog.String().Optional(),
+		"BidId": zog.String().Required(zog.Message("Bid ID is required")),
 	})
 
 	if err := schema.Validate(request); err != nil {
@@ -350,35 +351,34 @@ func (mw *validationMiddleware) PostHoldingBid(ctx context.Context, request *mod
 }
 
 func (mw *validationMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+	schema := zog.Struct(zog.Shape{
+		"PublicationMonth": zog.Int32().Required(),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
 	return mw.next.GetListHoldingBid(ctx, request)
 }
 
 func (mw *validationMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
-	schema := zog.Struct(zog.Shape{
-		"id":       zog.String().Required(zog.Message("ID is required")),
-		"owner_id": zog.String().Required(zog.Message("Owner ID is required")),
-	})
-
-	if err := schema.Validate(request); err != nil {
-		return nil, decode.ErrorFields(err)
-	}
-
 	return mw.next.PostWhitelabel(ctx, request)
 }
 
 func (mw *validationMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
-	schema := zog.Struct(zog.Shape{
-		"owner_id": zog.String().Required(zog.Message("ID is required")),
-	})
-
-	if err := schema.Validate(request); err != nil {
-		return nil, decode.ErrorFields(err)
-	}
-
 	return mw.next.GetWhitelabel(ctx, request)
 }
 
 func (mw *validationMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+	return mw.next.UpdateWhitelabel(ctx, request)
+}
+
+func (mw *validationMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
+	return mw.next.GetBids(ctx, request)
+}
+
+func (mw *validationMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
 	schema := zog.Struct(zog.Shape{
 		"id": zog.String().Required(zog.Message("ID is required")),
 	})
@@ -387,11 +387,7 @@ func (mw *validationMiddleware) UpdateWhitelabel(ctx context.Context, request *m
 		return nil, decode.ErrorFields(err)
 	}
 
-	return mw.next.UpdateWhitelabel(ctx, request)
-}
-
-func (mw *validationMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
-	return mw.next.GetBids(ctx, request)
+	return mw.next.GetBid(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -546,6 +542,10 @@ func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request 
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes: []string{"whitelabel:write"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+			client.ClientRole_Admin,
+		},
 	})
 
 	if err != nil {
@@ -582,6 +582,10 @@ func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, reques
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes: []string{"whitelabel:write"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+			client.ClientRole_Admin,
+		},
 	})
 
 	if err != nil {
@@ -607,4 +611,22 @@ func (mw *authenticationMiddleware) GetBids(ctx context.Context, request *model.
 	}
 
 	return mw.next.GetBids(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:read"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetBid(ctx, request)
 }
