@@ -307,10 +307,10 @@ func (mw *validationMiddleware) GetLicense(ctx context.Context, request *pncp.Pn
 
 func (mw *validationMiddleware) PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.PostFavoriteBidResponse, error) {
 	schema := zog.Struct(zog.Shape{
-		"process_id": zog.String().Required(zog.Message("Process ID is required")),
-		"title":      zog.String().Required(zog.Message("Title is required")),
-		"content":    zog.String().Required(zog.Message("Content is required")),
-		"sequence":   zog.Int32().Required(zog.Message("Sequence is required")),
+		"ProcessId": zog.String().Required(zog.Message("Process ID is required")),
+		"title":     zog.String().Required(zog.Message("Title is required")),
+		"content":   zog.String().Required(zog.Message("Content is required")),
+		"sequence":  zog.Int32().Required(zog.Message("Sequence is required")),
 	})
 
 	if err := schema.Validate(request); err != nil {

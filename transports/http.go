@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	apperrors "audita-api-gateway/pkg/errors"
@@ -535,7 +536,7 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 	}
 
 	if value, ok := decode.RetrieveQueryValue(q, "term"); ok {
-		ctx = metadata.AppendToOutgoingContext(ctx, "term", value)
+		ctx = metadata.AppendToOutgoingContext(ctx, "term", url.PathEscape(value))
 	}
 
 	if value, ok := decode.RetrieveQueryValue(q, "min_value"); ok {
@@ -581,7 +582,7 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 	if value, ok := decode.RetrieveQueryValue(q, "uf"); ok {
 		filter.Matches = append(filter.Matches, query.Match{
 			Key:   "uf",
-			Op:    "eq",
+			Op:    "in",
 			Value: value,
 		})
 	}
@@ -589,7 +590,15 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 	if value, ok := decode.RetrieveQueryValue(q, "city_ibge"); ok {
 		filter.Matches = append(filter.Matches, query.Match{
 			Key:   "city_ibge",
-			Op:    "eq",
+			Op:    "or",
+			Value: value,
+		})
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "proposal_closing_date_start"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "proposal_closing_date",
+			Op:    "gte",
 			Value: value,
 		})
 	}

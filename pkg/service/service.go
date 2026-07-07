@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -276,7 +277,9 @@ func genericListFilter(ctx context.Context, filter *query.Filter) context.Contex
 		"cursor":     filter.Cursor,
 		"sort":       filter.Sort.Key,
 		"sort-order": filter.Sort.Order,
-		"term":       filter.Term,
+		// gRPC metadata only carries printable ASCII; the bids store
+		// path-unescapes the term back before building the $regex.
+		"term": url.PathEscape(filter.Term),
 	})
 
 	for i, m := range filter.Matches {
