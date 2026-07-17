@@ -24,6 +24,7 @@ type EndpointSetup struct {
 	UpdateWhitelabel     endpoint.Endpoint
 	GetBids              endpoint.Endpoint
 	GetBid               endpoint.Endpoint
+	GetBidHandles        endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -39,6 +40,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var UpdateWhitelabel endpoint.Endpoint
 	var GetBids endpoint.Endpoint
 	var GetBid endpoint.Endpoint
+	var GetBidHandles endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -91,6 +93,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetBid = MakeGetBidEndpoint(s)
 		GetBid = loggingMiddleware("GetBid")(GetBid)
 		GetBid = metricsMiddleware("GetBid")(GetBid)
+
+		GetBidHandles = MakeGetBidHandlesEndpoint(s)
+		GetBidHandles = loggingMiddleware("GetBidHandles")(GetBidHandles)
+		GetBidHandles = metricsMiddleware("GetBidHandles")(GetBidHandles)
 	}
 
 	return &EndpointSetup{
@@ -106,6 +112,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		UpdateWhitelabel:     UpdateWhitelabel,
 		GetBids:              GetBids,
 		GetBid:               GetBid,
+		GetBidHandles:        GetBidHandles,
 	}
 }
 
@@ -308,6 +315,22 @@ func MakeGetBidEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.BidRequest)
 
 		fc, err := s.GetBid(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetBidHandlesEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.BidRequest)
+
+		fc, err := s.GetBidHandles(ctx, r)
 
 		if err != nil {
 			return &Resp{

@@ -36,6 +36,7 @@ type Service interface {
 	UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
 	GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error)
 	GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error)
+	GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error)
 }
 
 type service struct {
@@ -247,6 +248,15 @@ func (s *service) GetBids(ctx context.Context, _ *model.BidRequest) (*bids.GetLi
 func (s *service) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
 	return s.bids.GetBid(ctx, &bids.GetBidRequest{
 		Id: request.Id,
+	})
+}
+
+func (s *service) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.bids.GetBidClientHandles(ctx, &bids.GetBidClientHandlesRequest{
+		BidId:  request.Id,
+		UserId: user.Id,
 	})
 }
 

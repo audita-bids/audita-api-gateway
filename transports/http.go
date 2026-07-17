@@ -269,6 +269,25 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodGet).
+		Path("/bids/{id}/handles").
+		Handler(httptransport.NewServer(
+			endpoint.GetBidHandles,
+			decodeGetBidHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	return r
 }
 
@@ -590,7 +609,7 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 	if value, ok := decode.RetrieveQueryValue(q, "city_ibge"); ok {
 		filter.Matches = append(filter.Matches, query.Match{
 			Key:   "city_ibge",
-			Op:    "or",
+			Op:    "in",
 			Value: value,
 		})
 	}

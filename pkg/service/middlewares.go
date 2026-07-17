@@ -140,6 +140,15 @@ func (mw *loggingMiddleware) GetBid(ctx context.Context, request *model.BidReque
 	return mw.next.GetBid(ctx, request)
 }
 
+func (mw *loggingMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetBidHandles", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetBidHandles", "status", "started")
+	return mw.next.GetBidHandles(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -273,6 +282,16 @@ func (mw *recoveryMiddleware) GetBid(ctx context.Context, request *model.BidRequ
 	return mw.next.GetBid(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetBidHandles", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetBidHandles(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -388,6 +407,18 @@ func (mw *validationMiddleware) GetBid(ctx context.Context, request *model.BidRe
 	}
 
 	return mw.next.GetBid(ctx, request)
+}
+
+func (mw *validationMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
+	schema := zog.Struct(zog.Shape{
+		"id": zog.String().Required(zog.Message("ID is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.GetBidHandles(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -629,4 +660,22 @@ func (mw *authenticationMiddleware) GetBid(ctx context.Context, request *model.B
 	}
 
 	return mw.next.GetBid(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:read"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetBidHandles(ctx, request)
 }
