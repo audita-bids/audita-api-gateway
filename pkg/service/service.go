@@ -3,11 +3,16 @@ package service
 import (
 	"audita-api-gateway/request"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/newdesksoftwares/private-kit/connectors"
@@ -87,11 +92,8 @@ func (s *service) PostFavoriteBid(ctx context.Context, request *model.FavoriteBi
 	request.UserId = user.Id
 
 	return s.bids.PostFavoriteBid(ctx, &bids.PostFavoriteBidRequest{
-		Title:     request.Title,
-		Content:   request.Content,
-		Sequence:  request.Sequence,
-		ProcessId: request.ProcessId,
-		UserId:    request.UserId,
+		UserId: request.UserId,
+		BidId:  request.BidId,
 	})
 }
 
@@ -109,12 +111,27 @@ func (s *service) GetListFavoriteBid(ctx context.Context, request *model.Favorit
 func (s *service) PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
 
-	request.UserID = user.Id
+	request.UserId = user.Id
+
+	bid, err := s.bids.GetBid(ctx, &bids.GetBidRequest{Id: request.BidId})
+	if err != nil {
+		return nil, err
+	}
+
+	edital := findEdital(bid.GetFiles())
+	if edital == nil {
+		return nil, fmt.Errorf("no edital identified among the bid files")
+	}
+
+	raw, err := download(ctx, edital.Url)
+	if err != nil {
+		return nil, err
+	}
 
 	return s.agents.PostAnalysis(ctx, &agents.PostAnalysisRequest{
-		UserId:    request.UserID,
-		Base64:    request.Base64,
-		ProcessId: request.ProcessID,
+		UserId:    request.UserId,
+		Base64:    base64.StdEncoding.EncodeToString(raw),
+		ProcessId: request.BidId,
 	})
 }
 
@@ -301,4 +318,52 @@ func genericListFilter(ctx context.Context, filter *query.Filter) context.Contex
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	return ctx
+}
+
+var documentClient = &http.Client{Timeout: 90 * time.Second}
+
+const maxEditalBytes = 40 * 1024 * 1024
+
+func download(ctx context.Context, fileURL string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := documentClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("document download failed: %s (%d)", fileURL, resp.StatusCode)
+	}
+
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxEditalBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > maxEditalBytes {
+		return nil, fmt.Errorf("edital exceeds the %d MB limit: %s", maxEditalBytes>>20, fileURL)
+	}
+
+	return raw, nil
+}
+
+var editalCompanionRe = regexp.MustCompile(`(?i)anexo|adendo|errata|retifica|esclarec|impugna|resposta|minuta|planilha|termo\s+de\s+refer`)
+
+func findEdital(files []*bids.BidFile) *bids.BidFile {
+	for _, f := range files {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(f.GetType())), "edital") {
+			return f
+		}
+	}
+	for _, f := range files {
+		name := strings.ToLower(f.GetName())
+		if strings.Contains(name, "edital") && !editalCompanionRe.MatchString(name) {
+			return f
+		}
+	}
+	return nil
 }

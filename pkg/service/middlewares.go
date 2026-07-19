@@ -326,10 +326,7 @@ func (mw *validationMiddleware) GetLicense(ctx context.Context, request *pncp.Pn
 
 func (mw *validationMiddleware) PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.PostFavoriteBidResponse, error) {
 	schema := zog.Struct(zog.Shape{
-		"ProcessId": zog.String().Required(zog.Message("Process ID is required")),
-		"title":     zog.String().Required(zog.Message("Title is required")),
-		"content":   zog.String().Required(zog.Message("Content is required")),
-		"sequence":  zog.Int32().Required(zog.Message("Sequence is required")),
+		"BidId": zog.String().Required(zog.Message("Bid ID is required")),
 	})
 
 	if err := schema.Validate(request); err != nil {
@@ -345,9 +342,7 @@ func (mw *validationMiddleware) GetListFavoriteBid(ctx context.Context, request 
 
 func (mw *validationMiddleware) PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error) {
 	schema := zog.Struct(zog.Shape{
-		"process_id": zog.String().Required(zog.Message("Process ID is required")),
-		"sequence":   zog.Int32().Required(zog.Message("Sequence is required")),
-		"base64":     zog.String().Required(zog.Message("Base64 is required")),
+		"BidId": zog.String().Required(zog.Message("Bid ID is required")),
 	})
 
 	if err := schema.Validate(request); err != nil {

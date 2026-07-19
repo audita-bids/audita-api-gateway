@@ -106,7 +106,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 		))
 
 	r.Methods(http.MethodPost).
-		Path("/{process_id}/analysis").
+		Path("/{bid_id}/analysis").
 		Handler(httptransport.NewServer(
 			endpoint.PostAnalysis,
 			decodeAnalysisHTTP,
@@ -388,6 +388,9 @@ func decodeAnalysisHTTP(ctx context.Context, r *http.Request) (request interface
 	if err != nil {
 		return nil, err
 	}
+
+	// The bid being analyzed comes from the route (`/{bid_id}/analysis`).
+	req.BidId = mux.Vars(r)["bid_id"]
 
 	return &req, nil
 }

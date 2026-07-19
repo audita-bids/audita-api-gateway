@@ -12,21 +12,16 @@ import (
 
 type FavoriteBidRequest struct {
 	Id        string `json:"id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Sequence  int32  `json:"sequence"`
-	ProcessId string `json:"process_id"`
+	BidId     string `json:"bid_id"`
 	UserId    string `json:"user_id"`
 	CreatedAt string `json:"created_at"`
 }
 
 type AnalysisRequest struct {
-	Id        string `json:"id"`
-	UserID    string `json:"user_id"`
-	ProcessID string `json:"process_id"`
-	Sequence  int32  `json:"sequence"`
-	Content   string `json:"content"`
-	Base64    string `json:"base64"`
+	Id     string `json:"id"`
+	BidId  string `json:"bid_id"`
+	Base64 string `json:"base64"`
+	UserId string `json:"user_id"`
 }
 
 type IntegrationRequest struct {
