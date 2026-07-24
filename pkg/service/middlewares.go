@@ -149,6 +149,24 @@ func (mw *loggingMiddleware) GetBidHandles(ctx context.Context, request *model.B
 	return mw.next.GetBidHandles(ctx, request)
 }
 
+func (mw *loggingMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostBidProposal", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostBidProposal", "status", "started")
+	return mw.next.PostBidProposal(ctx, request)
+}
+
+func (mw *loggingMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "UpdateBidProposal", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "UpdateBidProposal", "status", "started")
+	return mw.next.UpdateBidProposal(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -292,6 +310,26 @@ func (mw *recoveryMiddleware) GetBidHandles(ctx context.Context, request *model.
 	return mw.next.GetBidHandles(ctx, request)
 }
 
+func (mw *recoveryMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostBidProposal", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.PostBidProposal(ctx, request)
+}
+
+func (mw *recoveryMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "UpdateBidProposal", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.UpdateBidProposal(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -414,6 +452,24 @@ func (mw *validationMiddleware) GetBidHandles(ctx context.Context, request *mode
 	}
 
 	return mw.next.GetBidHandles(ctx, request)
+}
+
+func (mw *validationMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"BidId":       zog.String().Required(zog.Message("Bid ID is required")),
+		"value":       zog.Float64().Optional().GTE(0),
+		"observation": zog.String().Optional().Max(500),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PostBidProposal(ctx, request)
+}
+
+func (mw *validationMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	return mw.next.UpdateBidProposal(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -673,4 +729,40 @@ func (mw *authenticationMiddleware) GetBidHandles(ctx context.Context, request *
 	}
 
 	return mw.next.GetBidHandles(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:write"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostBidProposal(ctx, request)
+}
+
+func (mw *authenticationMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:write"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.UpdateBidProposal(ctx, request)
 }

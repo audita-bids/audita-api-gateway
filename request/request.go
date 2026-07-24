@@ -75,6 +75,14 @@ type BidRequest struct {
 	Id string
 }
 
+type ProposalRequest struct {
+	Id          string          `json:"id"`
+	BidId       string          `json:"bid_id"`
+	Files       []*bids.BidFile `json:"files"`
+	Value       float32         `json:"value"`
+	Observation string          `json:"observation"`
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
 }
@@ -95,9 +103,6 @@ func (h *HoldingRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(h)
 }
 
-// Decode reads JSON text fields when present. The GET handler sends no body and
-// the PATCH handler carries a multipart form (parsed in its HTTP decoder), so an
-// empty/EOF body is not an error here.
 func (w *WhitelabelRequest) Decode(r *http.Request) error {
 	if r.Body == nil {
 		return nil
@@ -110,4 +115,8 @@ func (w *WhitelabelRequest) Decode(r *http.Request) error {
 
 func (c *CdnResponse) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(c)
+}
+
+func (p *ProposalRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(p)
 }

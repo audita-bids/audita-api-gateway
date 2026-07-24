@@ -42,6 +42,8 @@ type Service interface {
 	GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error)
 	GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error)
 	GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error)
+	PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
+	UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 }
 
 type service struct {
@@ -277,6 +279,30 @@ func (s *service) GetBidHandles(ctx context.Context, request *model.BidRequest) 
 	})
 }
 
+func (s *service) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.bids.PostBidProposal(ctx, &bids.PostBidProposalRequest{
+		BidId:       request.Id,
+		UserId:      user.Id,
+		Value:       request.Value,
+		Files:       request.Files,
+		Observation: request.Observation,
+	})
+}
+
+func (s *service) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.bids.PutBidProposal(ctx, &bids.PutBidProposalRequest{
+		BidId:       request.Id,
+		UserId:      user.Id,
+		Value:       request.Value,
+		Files:       request.Files,
+		Observation: request.Observation,
+	})
+}
+
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {
 	var resp model.CdnResponse
 
@@ -304,9 +330,7 @@ func genericListFilter(ctx context.Context, filter *query.Filter) context.Contex
 		"cursor":     filter.Cursor,
 		"sort":       filter.Sort.Key,
 		"sort-order": filter.Sort.Order,
-		// gRPC metadata only carries printable ASCII; the bids store
-		// path-unescapes the term back before building the $regex.
-		"term": url.PathEscape(filter.Term),
+		"term":       url.PathEscape(filter.Term),
 	})
 
 	for i, m := range filter.Matches {

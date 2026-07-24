@@ -288,6 +288,25 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodPost).
+		Path("/bids/{bid_id}/proposals").
+		Handler(httptransport.NewServer(
+			endpoint.PostBidProposal,
+			decodeProposalHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	return r
 }
 
@@ -389,7 +408,19 @@ func decodeAnalysisHTTP(ctx context.Context, r *http.Request) (request interface
 		return nil, err
 	}
 
-	// The bid being analyzed comes from the route (`/{bid_id}/analysis`).
+	req.BidId = mux.Vars(r)["bid_id"]
+
+	return &req, nil
+}
+
+func decodeProposalHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.ProposalRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
+
 	req.BidId = mux.Vars(r)["bid_id"]
 
 	return &req, nil
@@ -437,8 +468,6 @@ func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request i
 		}
 	}
 
-	// Images are optional — only set the ones actually uploaded so an update
-	// that changes just text keeps the stored URIs.
 	files := map[string]*io.Reader{
 		"logoImage":       &req.LogoImage,
 		"mobileLogoImage": &req.MobileLogoImage,
