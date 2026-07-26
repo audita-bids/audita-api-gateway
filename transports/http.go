@@ -307,6 +307,25 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodPost).
+		Path("/billings/create").
+		Handler(httptransport.NewServer(
+			endpoint.GetAvailableLicenses,
+			getAvailableLicensesDecodeHTTPRequest,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	return r
 }
 
@@ -438,6 +457,17 @@ func decodeHoldingHTTP(ctx context.Context, r *http.Request) (request interface{
 }
 
 func decodeWhitelabelHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.WhitelabelRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func decodePaymentHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.WhitelabelRequest
 	err = req.Decode(r)
 

@@ -83,6 +83,11 @@ type ProposalRequest struct {
 	Observation string          `json:"observation"`
 }
 
+type PaymentRequest struct {
+	Id     string `json:"id"`
+	PlanId string `json:"plan_id"`
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
 }

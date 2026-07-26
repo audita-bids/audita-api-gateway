@@ -20,6 +20,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/keys"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
@@ -44,6 +45,7 @@ type Service interface {
 	GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error)
 	PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
+	PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error)
 }
 
 type service struct {
@@ -55,6 +57,7 @@ type service struct {
 	bids       bids.BidsServiceClient
 	agents     agents.AgentsServiceClient
 	whitelabel whitelabel.WhitelabelServiceClient
+	billings   billings.BillingServiceClient
 }
 
 func NewService(logger log.Logger) Service {
@@ -300,6 +303,15 @@ func (s *service) UpdateBidProposal(ctx context.Context, request *model.Proposal
 		Value:       request.Value,
 		Files:       request.Files,
 		Observation: request.Observation,
+	})
+}
+
+func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.billings.CreatePayment(ctx, &billings.PostPaymentRequest{
+		UserId: user.Id,
+		PlanId: request.PlanId,
 	})
 }
 

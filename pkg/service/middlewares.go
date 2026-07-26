@@ -11,6 +11,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/middlewares"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
@@ -165,6 +166,15 @@ func (mw *loggingMiddleware) UpdateBidProposal(ctx context.Context, request *mod
 
 	mw.logger.Log("method", "UpdateBidProposal", "status", "started")
 	return mw.next.UpdateBidProposal(ctx, request)
+}
+
+func (mw *loggingMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "PostPayment", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostPayment", "status", "started")
+	return mw.next.PostPayment(ctx, request)
 }
 
 func RecoveryMiddleware(logger log.Logger) Middleware {
@@ -330,6 +340,16 @@ func (mw *recoveryMiddleware) UpdateBidProposal(ctx context.Context, request *mo
 	return mw.next.UpdateBidProposal(ctx, request)
 }
 
+func (mw *recoveryMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostPayment", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.PostPayment(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -470,6 +490,19 @@ func (mw *validationMiddleware) PostBidProposal(ctx context.Context, request *mo
 
 func (mw *validationMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
 	return mw.next.UpdateBidProposal(ctx, request)
+}
+
+func (mw *validationMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
+	schema := zog.Struct(zog.Shape{
+		"UserId": zog.String().Required(zog.Message("User ID is required")),
+		"PlanId": zog.String().Required(zog.Message("Plan ID is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PostPayment(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -765,4 +798,22 @@ func (mw *authenticationMiddleware) UpdateBidProposal(ctx context.Context, reque
 	}
 
 	return mw.next.UpdateBidProposal(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"payments:write"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostPayment(ctx, request)
 }
