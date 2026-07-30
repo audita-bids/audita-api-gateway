@@ -27,6 +27,7 @@ type EndpointSetup struct {
 	GetBidHandles        endpoint.Endpoint
 	PostBidProposal      endpoint.Endpoint
 	UpdateBidProposal    endpoint.Endpoint
+	PostPayment          endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -45,6 +46,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetBidHandles endpoint.Endpoint
 	var PostBidProposal endpoint.Endpoint
 	var UpdateBidProposal endpoint.Endpoint
+	var PostPayment endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -109,6 +111,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		UpdateBidProposal = MakeUpdateBidProposalEndpoint(s)
 		UpdateBidProposal = loggingMiddleware("UpdateBidProposal")(UpdateBidProposal)
 		UpdateBidProposal = metricsMiddleware("UpdateBidProposal")(UpdateBidProposal)
+
+		PostPayment = MakePostPaymentEndpoint(s)
+		PostPayment = loggingMiddleware("PostPayment")(PostPayment)
+		PostPayment = metricsMiddleware("PostPayment")(PostPayment)
 	}
 
 	return &EndpointSetup{
@@ -127,6 +133,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetBidHandles:        GetBidHandles,
 		PostBidProposal:      PostBidProposal,
 		UpdateBidProposal:    UpdateBidProposal,
+		PostPayment:          PostPayment,
 	}
 }
 
@@ -377,6 +384,22 @@ func MakeUpdateBidProposalEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.ProposalRequest)
 
 		fc, err := s.UpdateBidProposal(ctx, r)
+
+		if err != nil {
+			return &Resp{
+				Error: err,
+			}, nil
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostPaymentEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.PaymentRequest)
+
+		fc, err := s.PostPayment(ctx, r)
 
 		if err != nil {
 			return &Resp{

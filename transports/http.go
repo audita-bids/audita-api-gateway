@@ -308,10 +308,10 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 		))
 
 	r.Methods(http.MethodPost).
-		Path("/billings/create").
+		Path("/billings/payment").
 		Handler(httptransport.NewServer(
-			endpoint.GetAvailableLicenses,
-			getAvailableLicensesDecodeHTTPRequest,
+			endpoint.PostPayment,
+			decodePaymentHTTP,
 			encodeHttpResponse,
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
@@ -468,7 +468,7 @@ func decodeWhitelabelHTTP(ctx context.Context, r *http.Request) (request interfa
 }
 
 func decodePaymentHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
-	var req model.WhitelabelRequest
+	var req model.PaymentRequest
 	err = req.Decode(r)
 
 	if err != nil {

@@ -309,9 +309,31 @@ func (s *service) UpdateBidProposal(ctx context.Context, request *model.Proposal
 func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
 
+	payer := request.Payer
+
+	if payer == nil {
+		payer = &billings.PayerComplete{}
+	}
+
+	if payer.Email == "" {
+		payer.Email = user.Email
+	}
+
 	return s.billings.CreatePayment(ctx, &billings.PostPaymentRequest{
-		UserId: user.Id,
-		PlanId: request.PlanId,
+		UserId:                  user.Id,
+		PlanId:                  request.PlanId,
+		PaymentMethod:           request.PaymentMethod,
+		ProviderPaymentMethodId: request.ProviderPaymentMethodId,
+		Token:                   request.Token,
+		Installments:            request.Installments,
+		IssuerId:                request.IssuerId,
+		Payer:                   payer,
+		IdempotencyKey:          request.IdempotencyKey,
+		DeviceId:                request.DeviceId,
+		IpAddress:               request.IpAddress,
+		CallbackUrl:             request.CallbackUrl,
+		CouponCode:              request.CouponCode,
+		Metadata:                request.Metadata,
 	})
 }
 

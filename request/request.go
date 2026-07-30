@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 )
 
@@ -84,8 +87,20 @@ type ProposalRequest struct {
 }
 
 type PaymentRequest struct {
-	Id     string `json:"id"`
-	PlanId string `json:"plan_id"`
+	Id                      string                  `json:"id"`
+	PlanId                  string                  `json:"plan_id"`
+	PaymentMethod           billings.PaymentMethod  `json:"payment_method"`
+	ProviderPaymentMethodId string                  `json:"provider_payment_method_id"`
+	Token                   string                  `json:"token"`
+	Installments            int32                   `json:"installments"`
+	IssuerId                string                  `json:"issuer_id"`
+	Payer                   *billings.PayerComplete `json:"payer"`
+	IdempotencyKey          string                  `json:"idempotency_key"`
+	DeviceId                string                  `json:"device_id"`
+	IpAddress               string                  `json:"-"`
+	CallbackUrl             string                  `json:"callback_url"`
+	CouponCode              string                  `json:"coupon_code"`
+	Metadata                map[string]string       `json:"metadata"`
 }
 
 type CdnResponse struct {
@@ -124,4 +139,34 @@ func (c *CdnResponse) Decode(r *http.Request) error {
 
 func (p *ProposalRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(p)
+}
+
+func (p *PaymentRequest) Decode(r *http.Request) error {
+	if err := json.NewDecoder(r.Body).Decode(p); err != nil {
+		return err
+	}
+
+	p.IpAddress = clientIP(r)
+
+	return nil
+}
+
+func clientIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		if first, _, found := strings.Cut(forwarded, ","); found {
+			return strings.TrimSpace(first)
+		}
+		return strings.TrimSpace(forwarded)
+	}
+
+	if real := r.Header.Get("X-Real-Ip"); real != "" {
+		return strings.TrimSpace(real)
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+
+	return host
 }
