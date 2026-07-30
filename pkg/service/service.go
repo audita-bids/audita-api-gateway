@@ -74,6 +74,7 @@ func NewService(logger log.Logger) Service {
 			clients:    clients,
 			agents:     agents.NewAgentsServiceClient(connectors.Agents()),
 			whitelabel: whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
+			billings:   billings.NewBillingServiceClient(connectors.Billings()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
 		svc = ValidationMiddleware(logger)(svc)
@@ -309,16 +310,6 @@ func (s *service) UpdateBidProposal(ctx context.Context, request *model.Proposal
 func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
 
-	payer := request.Payer
-
-	if payer == nil {
-		payer = &billings.PayerComplete{}
-	}
-
-	if payer.Email == "" {
-		payer.Email = user.Email
-	}
-
 	return s.billings.CreatePayment(ctx, &billings.PostPaymentRequest{
 		UserId:                  user.Id,
 		PlanId:                  request.PlanId,
@@ -327,7 +318,7 @@ func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest
 		Token:                   request.Token,
 		Installments:            request.Installments,
 		IssuerId:                request.IssuerId,
-		Payer:                   payer,
+		Payer:                   request.Payer,
 		IdempotencyKey:          request.IdempotencyKey,
 		DeviceId:                request.DeviceId,
 		IpAddress:               request.IpAddress,

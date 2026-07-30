@@ -87,11 +87,19 @@ func FromGRPC(err error) *HTTPError {
 	}
 
 	httpStatus := grpcToHTTPStatus(code)
+	niceMsg := code.String()
+
+	switch code {
+	case codes.Unavailable:
+		niceMsg = "service actually unavailable"
+	default:
+		niceMsg = "internal error"
+	}
 
 	return &HTTPError{
 		Status:  httpStatus,
 		Code:    strings.ToLower(code.String()),
-		Message: message,
+		Message: niceMsg,
 	}
 }
 

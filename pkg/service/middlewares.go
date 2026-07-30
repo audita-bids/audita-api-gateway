@@ -494,8 +494,20 @@ func (mw *validationMiddleware) UpdateBidProposal(ctx context.Context, request *
 
 func (mw *validationMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
 	schema := zog.Struct(zog.Shape{
-		"UserId": zog.String().Required(zog.Message("User ID is required")),
+		"PaymentMethod": zog.CustomFunc(func(pm *billings.PaymentMethod, ctx zog.Ctx) bool {
+			switch *pm {
+			case billings.PaymentMethod_PAYMENT_METHOD_CREDIT_CARD,
+				billings.PaymentMethod_PAYMENT_METHOD_PIX,
+				billings.PaymentMethod_PAYMENT_METHOD_BOLETO:
+				return true
+			default:
+				return false
+			}
+		}, zog.Message("Invalid payment method")),
 		"PlanId": zog.String().Required(zog.Message("Plan ID is required")),
+		"Payer": zog.Ptr(zog.Struct(zog.Shape{
+			"Email": zog.String().Required(zog.Message("Payer email is required")),
+		})).NotNil(zog.Message("Payer is required")),
 	})
 
 	if err := schema.Validate(request); err != nil {
@@ -809,6 +821,9 @@ func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *mo
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes: []string{"payments:write"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
 	})
 
 	if err != nil {

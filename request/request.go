@@ -87,20 +87,21 @@ type ProposalRequest struct {
 }
 
 type PaymentRequest struct {
-	Id                      string                  `json:"id"`
-	PlanId                  string                  `json:"plan_id"`
-	PaymentMethod           billings.PaymentMethod  `json:"payment_method"`
-	ProviderPaymentMethodId string                  `json:"provider_payment_method_id"`
-	Token                   string                  `json:"token"`
-	Installments            int32                   `json:"installments"`
-	IssuerId                string                  `json:"issuer_id"`
-	Payer                   *billings.PayerComplete `json:"payer"`
-	IdempotencyKey          string                  `json:"idempotency_key"`
-	DeviceId                string                  `json:"device_id"`
-	IpAddress               string                  `json:"-"`
-	CallbackUrl             string                  `json:"callback_url"`
-	CouponCode              string                  `json:"coupon_code"`
-	Metadata                map[string]string       `json:"metadata"`
+	Id                      string                   `json:"id"`
+	PlanId                  string                   `json:"plan_id"`
+	PaymentMethod           billings.PaymentMethod   `json:"payment_method"`
+	ProviderPaymentMethodId string                   `json:"provider_payment_method_id"`
+	Token                   string                   `json:"token"`
+	Installments            int32                    `json:"installments"`
+	IssuerId                string                   `json:"issuer_id"`
+	Payer                   *billings.PayerComplete  `json:"payer"`
+	IdempotencyKey          string                   `json:"idempotency_key"`
+	DeviceId                string                   `json:"device_id"`
+	IpAddress               string                   `json:"-"`
+	CallbackUrl             string                   `json:"callback_url"`
+	CouponCode              string                   `json:"coupon_code"`
+	Metadata                map[string]string        `json:"metadata"`
+	PaymentProvider         billings.PaymentProvider `json:"payment_provider"`
 }
 
 type CdnResponse struct {

@@ -155,7 +155,7 @@ func MakeGetAvailableLicensesEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 		return &Resp{
 			Items: fc,
@@ -171,7 +171,7 @@ func MakeGetLicenseEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return &Resp{
@@ -189,7 +189,7 @@ func MakeGetListFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return &Resp{
@@ -208,7 +208,7 @@ func MakePostFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -224,7 +224,7 @@ func MakePostAnalysisEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -240,7 +240,7 @@ func MakePostHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -256,7 +256,7 @@ func MakeGetListHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return &Resp{
@@ -274,7 +274,7 @@ func MakeGetWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -290,7 +290,7 @@ func MakePostWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -306,7 +306,7 @@ func MakeUpdateWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -322,7 +322,7 @@ func MakeGetBidsEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return &Resp{
@@ -340,7 +340,7 @@ func MakeGetBidEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -356,7 +356,7 @@ func MakeGetBidHandlesEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -372,7 +372,7 @@ func MakePostBidProposalEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -388,7 +388,7 @@ func MakeUpdateBidProposalEndpoint(s service.Service) endpoint.Endpoint {
 		if err != nil {
 			return &Resp{
 				Error: err,
-			}, nil
+			}, err
 		}
 
 		return fc, nil
@@ -402,9 +402,7 @@ func MakePostPaymentEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.PostPayment(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, nil
+			return nil, err
 		}
 
 		return fc, nil
