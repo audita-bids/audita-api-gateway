@@ -46,6 +46,7 @@ type Service interface {
 	PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error)
+	GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error)
 }
 
 type service struct {
@@ -326,6 +327,10 @@ func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest
 		CouponCode:              request.CouponCode,
 		Metadata:                request.Metadata,
 	})
+}
+
+func (s *service) GetListPlans(ctx context.Context, _ *model.PlanRequest) (*billings.GetListPlansResponse, error) {
+	return s.billings.GetListPlans(ctx, &billings.GetListPlansRequest{})
 }
 
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {

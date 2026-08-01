@@ -104,6 +104,9 @@ type PaymentRequest struct {
 	PaymentProvider         billings.PaymentProvider `json:"payment_provider"`
 }
 
+type PlanRequest struct {
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
 }

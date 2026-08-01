@@ -177,6 +177,15 @@ func (mw *loggingMiddleware) PostPayment(ctx context.Context, request *model.Pay
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *loggingMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetListPlans", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetListPlans", "status", "started")
+	return mw.next.GetListPlans(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -350,6 +359,16 @@ func (mw *recoveryMiddleware) PostPayment(ctx context.Context, request *model.Pa
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetListPlans", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetListPlans(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -515,6 +534,10 @@ func (mw *validationMiddleware) PostPayment(ctx context.Context, request *model.
 	}
 
 	return mw.next.PostPayment(ctx, request)
+}
+
+func (mw *validationMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
+	return mw.next.GetListPlans(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -831,4 +854,25 @@ func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *mo
 	}
 
 	return mw.next.PostPayment(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"plans:read"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetListPlans(ctx, request)
 }

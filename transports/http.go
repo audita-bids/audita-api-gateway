@@ -326,6 +326,25 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodGet).
+		Path("/billings/plans").
+		Handler(httptransport.NewServer(
+			endpoint.GetListPlans,
+			decodePlanRequestHTTP,
+			encodeHttpResponse,
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	return r
 }
 
@@ -475,6 +494,11 @@ func decodePaymentHTTP(ctx context.Context, r *http.Request) (request interface{
 		return nil, err
 	}
 
+	return &req, nil
+}
+
+func decodePlanRequestHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.PlanRequest
 	return &req, nil
 }
 

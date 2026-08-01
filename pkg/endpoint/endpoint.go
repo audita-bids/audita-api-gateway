@@ -28,6 +28,7 @@ type EndpointSetup struct {
 	PostBidProposal      endpoint.Endpoint
 	UpdateBidProposal    endpoint.Endpoint
 	PostPayment          endpoint.Endpoint
+	GetListPlans         endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -47,6 +48,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PostBidProposal endpoint.Endpoint
 	var UpdateBidProposal endpoint.Endpoint
 	var PostPayment endpoint.Endpoint
+	var GetListPlans endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -115,6 +117,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostPayment = MakePostPaymentEndpoint(s)
 		PostPayment = loggingMiddleware("PostPayment")(PostPayment)
 		PostPayment = metricsMiddleware("PostPayment")(PostPayment)
+
+		GetListPlans = MakeGetListPlansEndpoint(s)
+		GetListPlans = loggingMiddleware("GetListPlans")(GetListPlans)
+		GetListPlans = metricsMiddleware("GetListPlans")(GetListPlans)
 	}
 
 	return &EndpointSetup{
@@ -134,6 +140,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostBidProposal:      PostBidProposal,
 		UpdateBidProposal:    UpdateBidProposal,
 		PostPayment:          PostPayment,
+		GetListPlans:         GetListPlans,
 	}
 }
 
@@ -406,6 +413,23 @@ func MakePostPaymentEndpoint(s service.Service) endpoint.Endpoint {
 		}
 
 		return fc, nil
+	}
+}
+
+func MakeGetListPlansEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.PlanRequest)
+
+		fc, err := s.GetListPlans(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return &Resp{
+			Items: fc.Plans,
+			Total: fc.Total,
+		}, nil
 	}
 }
 
