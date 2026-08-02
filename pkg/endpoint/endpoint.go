@@ -28,6 +28,7 @@ type EndpointSetup struct {
 	PostBidProposal      endpoint.Endpoint
 	UpdateBidProposal    endpoint.Endpoint
 	PostPayment          endpoint.Endpoint
+	PostPlan             endpoint.Endpoint
 	GetListPlans         endpoint.Endpoint
 }
 
@@ -48,6 +49,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PostBidProposal endpoint.Endpoint
 	var UpdateBidProposal endpoint.Endpoint
 	var PostPayment endpoint.Endpoint
+	var PostPlan endpoint.Endpoint
 	var GetListPlans endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
@@ -121,6 +123,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListPlans = MakeGetListPlansEndpoint(s)
 		GetListPlans = loggingMiddleware("GetListPlans")(GetListPlans)
 		GetListPlans = metricsMiddleware("GetListPlans")(GetListPlans)
+
+		PostPlan = MakePostPlanEndpoint(s)
+		PostPlan = loggingMiddleware("PostPlan")(PostPlan)
+		PostPlan = metricsMiddleware("PostPlan")(PostPlan)
 	}
 
 	return &EndpointSetup{
@@ -140,6 +146,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostBidProposal:      PostBidProposal,
 		UpdateBidProposal:    UpdateBidProposal,
 		PostPayment:          PostPayment,
+		PostPlan:             PostPlan,
 		GetListPlans:         GetListPlans,
 	}
 }
@@ -160,9 +167,7 @@ func MakeGetAvailableLicensesEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetAvailableLicenses(ctx, rpcRequest)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 		return &Resp{
 			Items: fc,
@@ -176,9 +181,7 @@ func MakeGetLicenseEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetLicense(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return &Resp{
@@ -194,9 +197,7 @@ func MakeGetListFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetListFavoriteBid(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return &Resp{
@@ -213,9 +214,7 @@ func MakePostFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.PostFavoriteBid(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -229,9 +228,7 @@ func MakePostAnalysisEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.PostAnalysis(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -245,9 +242,7 @@ func MakePostHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.PostHoldingBid(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -261,9 +256,7 @@ func MakeGetListHoldingBidEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetListHoldingBid(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return &Resp{
@@ -279,9 +272,7 @@ func MakeGetWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetWhitelabel(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -295,9 +286,7 @@ func MakePostWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.PostWhitelabel(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -311,9 +300,7 @@ func MakeUpdateWhitelabelEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.UpdateWhitelabel(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -327,9 +314,7 @@ func MakeGetBidsEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetBids(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return &Resp{
@@ -345,9 +330,7 @@ func MakeGetBidEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetBid(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -361,9 +344,7 @@ func MakeGetBidHandlesEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.GetBidHandles(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -377,9 +358,7 @@ func MakePostBidProposalEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.PostBidProposal(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -393,9 +372,7 @@ func MakeUpdateBidProposalEndpoint(s service.Service) endpoint.Endpoint {
 		fc, err := s.UpdateBidProposal(ctx, r)
 
 		if err != nil {
-			return &Resp{
-				Error: err,
-			}, err
+			return nil, err
 		}
 
 		return fc, nil
@@ -433,8 +410,21 @@ func MakeGetListPlansEndpoint(s service.Service) endpoint.Endpoint {
 	}
 }
 
+func MakePostPlanEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.PlanRequest)
+
+		fc, err := s.PostPlan(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
 type Resp struct {
-	Error  error       `json:"error,omitempty"`
 	Items  interface{} `json:"items,omitempty"`
 	Total  int64       `json:"total,omitempty"`
 	Cursor string      `json:"cursor,omitempty"`

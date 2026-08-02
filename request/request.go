@@ -105,6 +105,7 @@ type PaymentRequest struct {
 }
 
 type PlanRequest struct {
+	billings.PlanComplete
 }
 
 type CdnResponse struct {

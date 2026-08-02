@@ -46,6 +46,7 @@ type Service interface {
 	PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error)
+	PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error)
 	GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error)
 }
 
@@ -326,6 +327,25 @@ func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest
 		CallbackUrl:             request.CallbackUrl,
 		CouponCode:              request.CouponCode,
 		Metadata:                request.Metadata,
+	})
+}
+
+func (s *service) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
+	return s.billings.CreatePlan(ctx, &billings.PlanComplete{
+		Name:                 request.Name,
+		Slug:                 request.Slug,
+		Description:          request.Description,
+		PriceInCents:         request.PriceInCents,
+		Currency:             request.Currency,
+		BillingInterval:      request.BillingInterval,
+		BillingIntervalCount: request.BillingIntervalCount,
+		TrialDays:            request.TrialDays,
+		Type:                 request.Type,
+		Status:               request.Status,
+		IsPublic:             request.IsPublic,
+		Metadata:             request.Metadata,
+		CallbackUrl:          request.CallbackUrl,
+		Provider:             request.Provider,
 	})
 }
 

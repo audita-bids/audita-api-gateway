@@ -1,6 +1,7 @@
 package service
 
 import (
+	apperrors "audita-api-gateway/pkg/errors"
 	"audita-api-gateway/request"
 	"context"
 	"fmt"
@@ -177,6 +178,15 @@ func (mw *loggingMiddleware) PostPayment(ctx context.Context, request *model.Pay
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *loggingMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostPlan", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostPlan", "status", "started")
+	return mw.next.PostPlan(ctx, request)
+}
+
 func (mw *loggingMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
 	defer func() {
 		mw.logger.Log("method", "GetListPlans", "status", "completed")
@@ -200,169 +210,198 @@ type recoveryMiddleware struct {
 	logger log.Logger
 }
 
-func (mw *recoveryMiddleware) GetAvailableLicenses(ctx context.Context, request *pncp.PncpAvailableLicenseRequest) (*pncp.PncpAvailableLicenseResponse, error) {
+func (mw *recoveryMiddleware) GetAvailableLicenses(ctx context.Context, request *pncp.PncpAvailableLicenseRequest) (resp *pncp.PncpAvailableLicenseResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetAvailableLicenses", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetAvailableLicenses(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (*pncp.PncpFindLicenseResponse, error) {
+func (mw *recoveryMiddleware) GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (resp *pncp.PncpFindLicenseResponse, err error) {
 	defer func() {
-		mw.logger.Log("method", "GetLicense", "status", "completed")
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetLicense", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
 	}()
 
-	mw.logger.Log("method", "GetLicense", "status", "started")
 	return mw.next.GetLicense(ctx, request)
 }
 
-func (mw *recoveryMiddleware) PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.PostFavoriteBidResponse, error) {
+func (mw *recoveryMiddleware) PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (resp *bids.PostFavoriteBidResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "PostFavoriteBid", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.PostFavoriteBid(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetListFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.GetListFavoriteBidResponse, error) {
+func (mw *recoveryMiddleware) GetListFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (resp *bids.GetListFavoriteBidResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetListFavoriteBid", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetListFavoriteBid(ctx, request)
 }
 
-func (mw *recoveryMiddleware) PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error) {
+func (mw *recoveryMiddleware) PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (resp *agents.AgentsComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "PostAnalysis", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.PostAnalysis(ctx, request)
 }
 
-func (mw *recoveryMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
+func (mw *recoveryMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (resp *bids.HoldingBidComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "PostHoldingBid", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.PostHoldingBid(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
+func (mw *recoveryMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (resp *bids.GetListHoldingBidResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			mw.logger.Log("method", "GetListHoldingBid", "recovered", "error", r)
+			mw.logger.Log("method", "GetListHoldingBid", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetListHoldingBid(ctx, request)
 }
 
-func (mw *recoveryMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+func (mw *recoveryMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (resp *whitelabel.WhitelabelComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "PostWhitelabel", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.PostWhitelabel(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+func (mw *recoveryMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (resp *whitelabel.WhitelabelComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetWhitelabel", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetWhitelabel(ctx, request)
 }
 
-func (mw *recoveryMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
+func (mw *recoveryMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (resp *whitelabel.WhitelabelComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "UpdateWhitelabel", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.UpdateWhitelabel(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
+func (mw *recoveryMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (resp *bids.GetListBidsResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetBids", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetBids(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
+func (mw *recoveryMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (resp *bids.BidComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetBid", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetBid(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
+func (mw *recoveryMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (resp *bids.GetBidClientHandlesResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetBidHandles", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.GetBidHandles(ctx, request)
 }
 
-func (mw *recoveryMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+func (mw *recoveryMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (resp *bids.ProposalComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "PostBidProposal", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.PostBidProposal(ctx, request)
 }
 
-func (mw *recoveryMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
+func (mw *recoveryMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (resp *bids.ProposalComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "UpdateBidProposal", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.UpdateBidProposal(ctx, request)
 }
 
-func (mw *recoveryMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
+func (mw *recoveryMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (resp *billings.PostPaymentResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "PostPayment", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
 	return mw.next.PostPayment(ctx, request)
 }
 
-func (mw *recoveryMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
+func (mw *recoveryMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (resp *billings.PlanComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostPlan", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PostPlan(ctx, request)
+}
+
+func (mw *recoveryMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (resp *billings.GetListPlansResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mw.logger.Log("method", "GetListPlans", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
 		}
 	}()
 
@@ -538,6 +577,20 @@ func (mw *validationMiddleware) PostPayment(ctx context.Context, request *model.
 
 func (mw *validationMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
 	return mw.next.GetListPlans(ctx, request)
+}
+
+func (mw *validationMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"Name":         zog.String().Required(zog.Message("Plan name is required")),
+		"Description":  zog.String().Optional().Max(500),
+		"PriceInCents": zog.Int64().Required(zog.Message("Plan price is required")).GTE(0),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PostPlan(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -854,6 +907,27 @@ func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *mo
 	}
 
 	return mw.next.PostPayment(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"plans:write"},
+		Roles: []client.ClientRole{
+			client.ClientRole_SuperAdmin,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostPlan(ctx, request)
 }
 
 func (mw *authenticationMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {

@@ -1,8 +1,11 @@
 package errors
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/newdesksoftwares/private-kit/decode"
@@ -60,46 +63,21 @@ func FromGRPC(err error) *HTTPError {
 
 	code := st.Code()
 	message := cleanGRPCMessage(st.Message())
-	msgLower := strings.ToLower(message)
 
-	// Override status based on message content for Unknown/Internal errors
+	// Services answer with Unknown/Internal plus a plain error string, so the
+	// real intent has to be read from the message itself.
 	if code == codes.Unknown || code == codes.Internal {
-		switch {
-		case containsAny(msgLower, []string{"not found", "does not exist", "no documents"}):
-			return &HTTPError{
-				Status:  http.StatusNotFound,
-				Code:    "not_found",
-				Message: "not found",
-			}
-		case containsAny(msgLower, []string{"unauthorized", "invalid credentials"}):
-			return &HTTPError{
-				Status:  http.StatusUnauthorized,
-				Code:    "unauthorized",
-				Message: message,
-			}
-		case containsAny(msgLower, []string{"permission denied", "access denied"}):
-			return &HTTPError{
-				Status:  http.StatusForbidden,
-				Code:    "forbidden",
-				Message: message,
-			}
+		if classified := classify(message); classified != nil {
+			return classified
 		}
 	}
 
 	httpStatus := grpcToHTTPStatus(code)
-	niceMsg := code.String()
-
-	switch code {
-	case codes.Unavailable:
-		niceMsg = "service actually unavailable"
-	default:
-		niceMsg = "internal error"
-	}
 
 	return &HTTPError{
 		Status:  httpStatus,
-		Code:    strings.ToLower(code.String()),
-		Message: niceMsg,
+		Code:    statusCode(httpStatus),
+		Message: safeMessage(httpStatus, message),
 	}
 }
 
@@ -113,12 +91,23 @@ func ParseError(err error) *HTTPError {
 		return httpErr
 	}
 
+	// Field validation describes the caller's own payload, so it is safe to
+	// echo back as is.
 	var svcErr *decode.SvcError
 	if errors.As(err, &svcErr) {
 		return &HTTPError{
-			Status:  svcErr.Code,
+			Status:  http.StatusBadRequest,
 			Code:    "validation_error",
 			Message: svcErr.Message,
+		}
+	}
+
+	// A body the decoder could not read is the caller's mistake, not ours.
+	if malformedPayload(err) {
+		return &HTTPError{
+			Status:  http.StatusBadRequest,
+			Code:    "invalid_request",
+			Message: "invalid request payload",
 		}
 	}
 
@@ -126,33 +115,157 @@ func ParseError(err error) *HTTPError {
 		return grpcErr
 	}
 
-	msg := strings.ToLower(err.Error())
-	switch {
-	case containsAny(msg, []string{"not found"}):
-		return &HTTPError{
-			Status:  http.StatusNotFound,
-			Code:    "not_found",
-			Message: "Resource not found",
-		}
-	case containsAny(msg, []string{"unauthorized"}):
-		return &HTTPError{
-			Status:  http.StatusUnauthorized,
-			Code:    "unauthorized",
-			Message: "Unauthorized",
-		}
-	case containsAny(msg, []string{"insufficient"}):
-		return &HTTPError{
-			Status:  http.StatusUnauthorized,
-			Code:    "insufficient_scopes",
-			Message: "Insufficient scopes",
-		}
+	if classified := classify(err.Error()); classified != nil {
+		return classified
 	}
 
 	return &HTTPError{
 		Status:  http.StatusInternalServerError,
-		Code:    "internal_error",
-		Message: msg,
+		Code:    statusCode(http.StatusInternalServerError),
+		Message: statusMessage(http.StatusInternalServerError),
 	}
+}
+
+// classify recognises the failures this gateway knows about. Each branch
+// answers with a fixed message: the incoming text only picks the case, it is
+// never forwarded to the client.
+func classify(message string) *HTTPError {
+	msg := strings.ToLower(message)
+
+	switch {
+	case containsAny(msg, []string{"invalid credentials", "invalid client login", "invalid login"}):
+		return &HTTPError{
+			Status:  http.StatusUnauthorized,
+			Code:    "invalid_credentials",
+			Message: "invalid credentials",
+		}
+	case containsAny(msg, []string{
+		"token not found", "token is empty", "invalid token", "token expired",
+		"unauthorized", "user not found",
+	}):
+		return &HTTPError{
+			Status:  http.StatusUnauthorized,
+			Code:    "unauthorized",
+			Message: "unauthorized",
+		}
+	case containsAny(msg, []string{"insufficient scopes", "permission denied", "access denied"}):
+		return &HTTPError{
+			Status:  http.StatusForbidden,
+			Code:    "forbidden",
+			Message: "insufficient permissions",
+		}
+	case containsAny(msg, []string{"already exists", "duplicate"}):
+		return &HTTPError{
+			Status:  http.StatusConflict,
+			Code:    "already_exists",
+			Message: "resource already exists",
+		}
+	case containsAny(msg, []string{"not found", "does not exist", "no documents"}):
+		return &HTTPError{
+			Status:  http.StatusNotFound,
+			Code:    "not_found",
+			Message: "resource not found",
+		}
+	}
+
+	return nil
+}
+
+// malformedPayload reports whether err came from reading the request body or a
+// query parameter, which the transport hands over as a plain decoding error.
+func malformedPayload(err error) bool {
+	var (
+		syntaxErr *json.SyntaxError
+		typeErr   *json.UnmarshalTypeError
+		numErr    *strconv.NumError
+	)
+
+	return errors.As(err, &syntaxErr) ||
+		errors.As(err, &typeErr) ||
+		errors.As(err, &numErr) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
+}
+
+// safeMessage decides whether a downstream message may reach the client: 5xx
+// never carries detail, and anything shaped like infrastructure output falls
+// back to the generic text for the status.
+func safeMessage(status int, message string) string {
+	message = strings.TrimSpace(message)
+
+	if message == "" || status >= http.StatusInternalServerError || leaksInternals(message) {
+		return statusMessage(status)
+	}
+
+	return message
+}
+
+// maxMessageLen is the length past which a message stops looking like a
+// business rule and starts looking like a dump.
+const maxMessageLen = 180
+
+func leaksInternals(message string) bool {
+	if len(message) > maxMessageLen || strings.ContainsAny(message, "\n\t") {
+		return true
+	}
+
+	return containsAny(strings.ToLower(message), internalHints)
+}
+
+// internalHints are fragments that only ever come from storage engines,
+// infrastructure or the Go runtime — never from a business rule.
+var internalHints = []string{
+	"mongo", "sql", "postgres", "pq:", "pgx", "redis", "kafka", "elastic",
+	"collection", "database", "objectid", "duplicate key", "index out of range",
+	"dial tcp", "dial udp", "connection refused", "connection reset", "no such host",
+	"i/o timeout", "transport:", "rpc error", "grpc", "x509", "certificate",
+	"localhost", "127.0.0.1", ".svc", "http://", "https://",
+	"panic", "goroutine", "runtime error", "nil pointer", "stack", "syscall",
+	".go:", "0x",
+}
+
+var statusMessages = map[int]string{
+	http.StatusBadRequest:          "invalid request",
+	http.StatusUnauthorized:        "unauthorized",
+	http.StatusForbidden:           "insufficient permissions",
+	http.StatusNotFound:            "resource not found",
+	http.StatusRequestTimeout:      "request timeout",
+	http.StatusConflict:            "resource already exists",
+	http.StatusTooManyRequests:     "too many requests, try again later",
+	http.StatusInternalServerError: "internal server error",
+	http.StatusNotImplemented:      "not implemented",
+	http.StatusServiceUnavailable:  "service temporarily unavailable",
+	http.StatusGatewayTimeout:      "upstream service timeout",
+}
+
+var statusCodes = map[int]string{
+	http.StatusBadRequest:          "bad_request",
+	http.StatusUnauthorized:        "unauthorized",
+	http.StatusForbidden:           "forbidden",
+	http.StatusNotFound:            "not_found",
+	http.StatusRequestTimeout:      "request_timeout",
+	http.StatusConflict:            "conflict",
+	http.StatusTooManyRequests:     "too_many_requests",
+	http.StatusInternalServerError: "internal_error",
+	http.StatusNotImplemented:      "not_implemented",
+	http.StatusServiceUnavailable:  "service_unavailable",
+	http.StatusGatewayTimeout:      "gateway_timeout",
+}
+
+func statusMessage(status int) string {
+	if msg, ok := statusMessages[status]; ok {
+		return msg
+	}
+
+	return statusMessages[http.StatusInternalServerError]
+}
+
+func statusCode(status int) string {
+	if code, ok := statusCodes[status]; ok {
+		return code
+	}
+
+	return statusCodes[http.StatusInternalServerError]
 }
 
 func grpcToHTTPStatus(code codes.Code) int {

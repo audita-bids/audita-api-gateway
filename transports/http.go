@@ -36,6 +36,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetAvailableLicenses,
 			getAvailableLicensesDecodeHTTPRequest,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
 				return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
 					{
@@ -53,6 +54,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetLicense,
 			getFindLicenseDecodeHTTPRequest,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
 				return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
 					{
@@ -70,6 +72,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetListFavoriteBid,
 			decodeGetListFavoriteBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -92,6 +95,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.PostFavoriteBid,
 			decodePostFavoriteBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -111,6 +115,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.PostAnalysis,
 			decodeAnalysisHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -130,6 +135,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.PostHoldingBid,
 			decodeHoldingHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -152,6 +158,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetListHoldingBid,
 			decodeGetListHoldingBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -174,6 +181,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.PostWhitelabel,
 			decodeWhitelabelHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -193,6 +201,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.UpdateWhitelabel,
 			decodeWhitelabelUpdateHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -212,6 +221,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetWhitelabel,
 			decodeWhitelabelHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -234,6 +244,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetBids,
 			decodeBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -256,6 +267,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetBid,
 			decodeGetBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -275,6 +287,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetBidHandles,
 			decodeGetBidHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -294,6 +307,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.PostBidProposal,
 			decodeProposalHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -313,6 +327,27 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.PostPayment,
 			decodePaymentHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPost).
+		Path("/billings/plans").
+		Handler(httptransport.NewServer(
+			endpoint.PostPlan,
+			decodePlanRequestHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -332,6 +367,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			endpoint.GetListPlans,
 			decodePlanRequestHTTP,
 			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
 				func(ctx context.Context, r *http.Request) context.Context {
 					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
@@ -552,30 +588,21 @@ func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}
 }
 
 func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-	if resp, ok := response.(*endpoint.Resp); ok {
-		if resp.Error != nil {
-			httpErr := apperrors.ParseError(resp.Error)
-			writeError(w, httpErr)
-			return nil
-		}
-	}
-
-	if err, ok := response.(error); ok {
-		httpErr := apperrors.ParseError(err)
-		writeError(w, httpErr)
-		return nil
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(response)
+}
+
+// encodeError turns every endpoint or decode failure into the sanitized JSON
+// body the client is allowed to see.
+func encodeError(_ context.Context, err error, w http.ResponseWriter) {
+	writeError(w, apperrors.ParseError(err))
 }
 
 func writeError(w http.ResponseWriter, httpErr *apperrors.HTTPError) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpErr.Status)
 
-	if err := json.NewEncoder(w).Encode(httpErr); err != nil {
-	}
+	json.NewEncoder(w).Encode(httpErr)
 }
 
 // enriches
