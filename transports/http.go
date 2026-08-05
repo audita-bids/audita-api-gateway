@@ -535,6 +535,8 @@ func decodePaymentHTTP(ctx context.Context, r *http.Request) (request interface{
 
 func decodePlanRequestHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.PlanRequest
+	req.Decode(r)
+
 	return &req, nil
 }
 

@@ -583,7 +583,7 @@ func (mw *validationMiddleware) PostPlan(ctx context.Context, request *model.Pla
 	schema := zog.Struct(zog.Shape{
 		"Name":         zog.String().Required(zog.Message("Plan name is required")),
 		"Description":  zog.String().Optional().Max(500),
-		"PriceInCents": zog.Int64().Required(zog.Message("Plan price is required")).GTE(0),
+		"PriceInCents": zog.Int64().GTE(0),
 	})
 
 	if err := schema.Validate(request); err != nil {
@@ -941,6 +941,8 @@ func (mw *authenticationMiddleware) GetListPlans(ctx context.Context, request *m
 		Scopes: []string{"plans:read"},
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
+			client.ClientRole_SuperAdmin,
+			client.ClientRole_Admin,
 		},
 	})
 

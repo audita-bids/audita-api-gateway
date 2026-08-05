@@ -156,6 +156,10 @@ func (p *PaymentRequest) Decode(r *http.Request) error {
 	return nil
 }
 
+func (p *PlanRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(p)
+}
+
 func clientIP(r *http.Request) string {
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		if first, _, found := strings.Cut(forwarded, ","); found {
