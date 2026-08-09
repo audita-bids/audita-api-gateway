@@ -12,24 +12,27 @@ import (
 )
 
 type EndpointSetup struct {
-	GetAvailableLicenses endpoint.Endpoint
-	GetLicense           endpoint.Endpoint
-	GetListFavoriteBid   endpoint.Endpoint
-	PostFavoriteBid      endpoint.Endpoint
-	PostAnalysis         endpoint.Endpoint
-	PostHoldingBid       endpoint.Endpoint
-	GetListHoldingBid    endpoint.Endpoint
-	PostWhitelabel       endpoint.Endpoint
-	GetWhitelabel        endpoint.Endpoint
-	UpdateWhitelabel     endpoint.Endpoint
-	GetBids              endpoint.Endpoint
-	GetBid               endpoint.Endpoint
-	GetBidHandles        endpoint.Endpoint
-	PostBidProposal      endpoint.Endpoint
-	UpdateBidProposal    endpoint.Endpoint
-	PostPayment          endpoint.Endpoint
-	PostPlan             endpoint.Endpoint
-	GetListPlans         endpoint.Endpoint
+	GetAvailableLicenses     endpoint.Endpoint
+	GetLicense               endpoint.Endpoint
+	GetListFavoriteBid       endpoint.Endpoint
+	PostFavoriteBid          endpoint.Endpoint
+	PostAnalysis             endpoint.Endpoint
+	PostHoldingBid           endpoint.Endpoint
+	GetListHoldingBid        endpoint.Endpoint
+	PostWhitelabel           endpoint.Endpoint
+	GetWhitelabel            endpoint.Endpoint
+	UpdateWhitelabel         endpoint.Endpoint
+	GetBids                  endpoint.Endpoint
+	GetBid                   endpoint.Endpoint
+	GetBidHandles            endpoint.Endpoint
+	PostBidProposal          endpoint.Endpoint
+	UpdateBidProposal        endpoint.Endpoint
+	PostPayment              endpoint.Endpoint
+	PostPlan                 endpoint.Endpoint
+	GetListPlans             endpoint.Endpoint
+	GetListUserPayments      endpoint.Endpoint
+	GetListAllUsers          endpoint.Endpoint
+	PostCreateBusinessClient endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -51,6 +54,9 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PostPayment endpoint.Endpoint
 	var PostPlan endpoint.Endpoint
 	var GetListPlans endpoint.Endpoint
+	var GetListUserPayments endpoint.Endpoint
+	var GetListAllUsers endpoint.Endpoint
+	var PostCreateBusinessClient endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -127,6 +133,18 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostPlan = MakePostPlanEndpoint(s)
 		PostPlan = loggingMiddleware("PostPlan")(PostPlan)
 		PostPlan = metricsMiddleware("PostPlan")(PostPlan)
+
+		GetListUserPayments = MakeGetListUserPaymentsEndpoint(s)
+		GetListUserPayments = loggingMiddleware("GetListUserPayments")(GetListUserPayments)
+		GetListUserPayments = metricsMiddleware("GetListUserPayments")(GetListUserPayments)
+
+		GetListAllUsers = MakeGetListAllUsersEndpoint(s)
+		GetListAllUsers = loggingMiddleware("GetListAllUsers")(GetListAllUsers)
+		GetListAllUsers = metricsMiddleware("GetListAllUsers")(GetListAllUsers)
+
+		PostCreateBusinessClient = MakePostCreateBusinessClientEndpoint(s)
+		PostCreateBusinessClient = loggingMiddleware("PostCreateBusinessClient")(PostCreateBusinessClient)
+		PostCreateBusinessClient = metricsMiddleware("PostCreateBusinessClient")(PostCreateBusinessClient)
 	}
 
 	return &EndpointSetup{
@@ -148,6 +166,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostPayment:          PostPayment,
 		PostPlan:             PostPlan,
 		GetListPlans:         GetListPlans,
+		GetListUserPayments:  GetListUserPayments,
+		GetListAllUsers:      GetListAllUsers,
+
+		PostCreateBusinessClient: PostCreateBusinessClient,
 	}
 }
 
@@ -415,6 +437,48 @@ func MakePostPlanEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.PlanRequest)
 
 		fc, err := s.PostPlan(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetListUserPaymentsEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.PaymentRequest)
+
+		fc, err := s.GetListUserPayments(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetListAllUsersEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.ClientRequest)
+
+		fc, err := s.GetListAllUsers(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostCreateBusinessClientEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.BusinessClientRequest)
+
+		fc, err := s.PostCreateBusinessClient(ctx, r)
 
 		if err != nil {
 			return nil, err

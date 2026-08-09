@@ -381,6 +381,64 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodGet).
+		Path("/billings/payments").
+		Handler(httptransport.NewServer(
+			endpoint.GetListUserPayments,
+			decodeListPaymentHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/clients/business").
+		Handler(httptransport.NewServer(
+			endpoint.GetListAllUsers,
+			decodeListClientHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, request *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, request, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  request.Header.Get("Authorization"),
+						},
+					})
+				}),
+		))
+
+	r.Methods(http.MethodPost).
+		Path("/clients/business").
+		Handler(httptransport.NewServer(
+			endpoint.PostCreateBusinessClient,
+			decodeBusinessClientHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, request *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, request, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  request.Header.Get("Authorization"),
+						},
+					})
+				}),
+		))
+
 	return r
 }
 
@@ -522,11 +580,31 @@ func decodeWhitelabelHTTP(ctx context.Context, r *http.Request) (request interfa
 	return &req, nil
 }
 
+func decodeListPaymentHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.PaymentRequest
+	return &req, nil
+}
+
 func decodePaymentHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.PaymentRequest
 	err = req.Decode(r)
 
 	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func decodeListClientHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.ClientRequest
+	return &req, nil
+}
+
+func decodeBusinessClientHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.BusinessClientRequest
+
+	if err := req.Decode(r); err != nil {
 		return nil, err
 	}
 

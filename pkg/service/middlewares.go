@@ -196,6 +196,33 @@ func (mw *loggingMiddleware) GetListPlans(ctx context.Context, request *model.Pl
 	return mw.next.GetListPlans(ctx, request)
 }
 
+func (mw *loggingMiddleware) GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetListUserPayments", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetListUserPayments", "status", "started")
+	return mw.next.GetListUserPayments(ctx, request)
+}
+
+func (mw *loggingMiddleware) GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetListAllUsers", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetListAllUsers", "status", "started")
+	return mw.next.GetListAllUsers(ctx, request)
+}
+
+func (mw *loggingMiddleware) PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostCreateBusinessClient", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostCreateBusinessClient", "status", "started")
+	return mw.next.PostCreateBusinessClient(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -408,6 +435,39 @@ func (mw *recoveryMiddleware) GetListPlans(ctx context.Context, request *model.P
 	return mw.next.GetListPlans(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (resp *billings.GetListUserPaymentsResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetListUserPayments", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.GetListUserPayments(ctx, request)
+}
+
+func (mw *recoveryMiddleware) GetListAllUsers(ctx context.Context, request *model.ClientRequest) (resp *client.ListAllClientsResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetListAllUsers", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.GetListAllUsers(ctx, request)
+}
+
+func (mw *recoveryMiddleware) PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (resp *client.ClientComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostCreateBusinessClient", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PostCreateBusinessClient(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -591,6 +651,33 @@ func (mw *validationMiddleware) PostPlan(ctx context.Context, request *model.Pla
 	}
 
 	return mw.next.PostPlan(ctx, request)
+}
+
+func (mw *validationMiddleware) GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error) {
+	return mw.next.GetListUserPayments(ctx, request)
+}
+
+func (mw *validationMiddleware) GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error) {
+	return mw.next.GetListAllUsers(ctx, request)
+}
+
+func (mw *validationMiddleware) PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"Name": zog.String().
+			Min(2, zog.Message("Name must be at least 5 characters long")).Required(),
+		"Email": zog.String().
+			Email(zog.Message("Email must be a valid email address")).Required(),
+	})
+
+	if err := schema.Validate(&request.CreateBusinessClientRequest); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	if !request.GenerateRandomicPassword && len(request.Password) < 8 {
+		return nil, apperrors.BadRequest("validation_error", "Password must be at least 8 characters long")
+	}
+
+	return mw.next.PostCreateBusinessClient(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -951,4 +1038,69 @@ func (mw *authenticationMiddleware) GetListPlans(ctx context.Context, request *m
 	}
 
 	return mw.next.GetListPlans(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"payments:read"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+			client.ClientRole_Admin,
+			client.ClientRole_SuperAdmin,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetListUserPayments(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"clients:read"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetListAllUsers(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"client:create"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostCreateBusinessClient(ctx, request)
 }

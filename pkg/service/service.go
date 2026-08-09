@@ -48,6 +48,9 @@ type Service interface {
 	PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error)
 	PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error)
 	GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error)
+	GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error)
+	GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error)
+	PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
 }
 
 type service struct {
@@ -79,8 +82,8 @@ func NewService(logger log.Logger) Service {
 			billings:   billings.NewBillingServiceClient(connectors.Billings()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
-		svc = ValidationMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
+		svc = ValidationMiddleware(logger)(svc)
 		svc = AuthenticationMiddleware(logger, clients)(svc)
 	}
 
@@ -351,6 +354,38 @@ func (s *service) PostPlan(ctx context.Context, request *model.PlanRequest) (*bi
 
 func (s *service) GetListPlans(ctx context.Context, _ *model.PlanRequest) (*billings.GetListPlansResponse, error) {
 	return s.billings.GetListPlans(ctx, &billings.GetListPlansRequest{})
+}
+
+func (s *service) GetListUserPayments(ctx context.Context, _ *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.billings.GetListUserPayments(ctx, &billings.GetListUserPaymentsRequest{
+		UserId: user.Id,
+	})
+}
+
+func (s *service) GetListAllUsers(ctx context.Context, _ *model.ClientRequest) (*client.ListAllClientsResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.clients.ListAll(ctx, &client.ListAllClientsRequest{
+		OwnerId: user.Id,
+	})
+}
+
+func (s *service) PostCreateBusinessClient(ctx context.Context, r *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.clients.CreateBusinessClient(ctx, &client.CreateBusinessClientRequest{
+		ClientId:                 r.ClientId,
+		Name:                     r.Name,
+		Email:                    r.Email,
+		Password:                 r.Password,
+		OwnerId:                  user.Id,
+		ManagerId:                r.ManagerId,
+		Role:                     r.Role,
+		SendEmailAccess:          r.SendEmailAccess,
+		GenerateRandomicPassword: r.GenerateRandomicPassword,
+	})
 }
 
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {

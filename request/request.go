@@ -10,6 +10,7 @@ import (
 
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 )
 
@@ -108,6 +109,12 @@ type PlanRequest struct {
 	billings.PlanComplete
 }
 
+type ClientRequest struct{}
+
+type BusinessClientRequest struct {
+	client.CreateBusinessClientRequest
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
 }
@@ -147,7 +154,7 @@ func (p *ProposalRequest) Decode(r *http.Request) error {
 }
 
 func (p *PaymentRequest) Decode(r *http.Request) error {
-	if err := json.NewDecoder(r.Body).Decode(p); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		return err
 	}
 
@@ -158,6 +165,10 @@ func (p *PaymentRequest) Decode(r *http.Request) error {
 
 func (p *PlanRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(p)
+}
+
+func (b *BusinessClientRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(b)
 }
 
 func clientIP(r *http.Request) string {
