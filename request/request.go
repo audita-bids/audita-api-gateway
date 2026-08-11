@@ -111,6 +111,8 @@ type PlanRequest struct {
 
 type ClientRequest struct{}
 
+type ScopeRequest struct{}
+
 type BusinessClientRequest struct {
 	client.CreateBusinessClientRequest
 }

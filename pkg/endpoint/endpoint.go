@@ -33,6 +33,7 @@ type EndpointSetup struct {
 	GetListUserPayments      endpoint.Endpoint
 	GetListAllUsers          endpoint.Endpoint
 	PostCreateBusinessClient endpoint.Endpoint
+	GetListAllScopes         endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -57,6 +58,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetListUserPayments endpoint.Endpoint
 	var GetListAllUsers endpoint.Endpoint
 	var PostCreateBusinessClient endpoint.Endpoint
+	var GetListAllScopes endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -145,31 +147,35 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostCreateBusinessClient = MakePostCreateBusinessClientEndpoint(s)
 		PostCreateBusinessClient = loggingMiddleware("PostCreateBusinessClient")(PostCreateBusinessClient)
 		PostCreateBusinessClient = metricsMiddleware("PostCreateBusinessClient")(PostCreateBusinessClient)
+
+		GetListAllScopes = MakeGetListAllScopesEndpoint(s)
+		GetListAllScopes = loggingMiddleware("GetListAllScopes")(GetListAllScopes)
+		GetListAllScopes = metricsMiddleware("GetListAllScopes")(GetListAllScopes)
 	}
 
 	return &EndpointSetup{
-		GetAvailableLicenses: GetAvailableLicenses,
-		GetLicense:           GetLicense,
-		GetListFavoriteBid:   GetListFavoriteBid,
-		PostFavoriteBid:      PostFavoriteBid,
-		PostAnalysis:         PostAnalysis,
-		PostHoldingBid:       PostHoldingBid,
-		GetListHoldingBid:    GetListHoldingBid,
-		PostWhitelabel:       PostWhitelabel,
-		GetWhitelabel:        GetWhitelabel,
-		UpdateWhitelabel:     UpdateWhitelabel,
-		GetBids:              GetBids,
-		GetBid:               GetBid,
-		GetBidHandles:        GetBidHandles,
-		PostBidProposal:      PostBidProposal,
-		UpdateBidProposal:    UpdateBidProposal,
-		PostPayment:          PostPayment,
-		PostPlan:             PostPlan,
-		GetListPlans:         GetListPlans,
-		GetListUserPayments:  GetListUserPayments,
-		GetListAllUsers:      GetListAllUsers,
-
+		GetAvailableLicenses:     GetAvailableLicenses,
+		GetLicense:               GetLicense,
+		GetListFavoriteBid:       GetListFavoriteBid,
+		PostFavoriteBid:          PostFavoriteBid,
+		PostAnalysis:             PostAnalysis,
+		PostHoldingBid:           PostHoldingBid,
+		GetListHoldingBid:        GetListHoldingBid,
+		PostWhitelabel:           PostWhitelabel,
+		GetWhitelabel:            GetWhitelabel,
+		UpdateWhitelabel:         UpdateWhitelabel,
+		GetBids:                  GetBids,
+		GetBid:                   GetBid,
+		GetBidHandles:            GetBidHandles,
+		PostBidProposal:          PostBidProposal,
+		UpdateBidProposal:        UpdateBidProposal,
+		PostPayment:              PostPayment,
+		PostPlan:                 PostPlan,
+		GetListPlans:             GetListPlans,
+		GetListUserPayments:      GetListUserPayments,
+		GetListAllUsers:          GetListAllUsers,
 		PostCreateBusinessClient: PostCreateBusinessClient,
+		GetListAllScopes:         GetListAllScopes,
 	}
 }
 
@@ -479,6 +485,20 @@ func MakePostCreateBusinessClientEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.BusinessClientRequest)
 
 		fc, err := s.PostCreateBusinessClient(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetListAllScopesEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.ScopeRequest)
+
+		fc, err := s.GetListAllScopes(ctx, r)
 
 		if err != nil {
 			return nil, err

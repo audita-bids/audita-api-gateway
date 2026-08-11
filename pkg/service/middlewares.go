@@ -223,6 +223,15 @@ func (mw *loggingMiddleware) PostCreateBusinessClient(ctx context.Context, reque
 	return mw.next.PostCreateBusinessClient(ctx, request)
 }
 
+func (mw *loggingMiddleware) GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "GetListAllScopes", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetListAllScopes", "status", "started")
+	return mw.next.GetListAllScopes(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -468,6 +477,16 @@ func (mw *recoveryMiddleware) PostCreateBusinessClient(ctx context.Context, requ
 	return mw.next.PostCreateBusinessClient(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetListAllScopes", "status", "recovered", "error", r)
+		}
+	}()
+
+	return mw.next.GetListAllScopes(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -678,6 +697,10 @@ func (mw *validationMiddleware) PostCreateBusinessClient(ctx context.Context, re
 	}
 
 	return mw.next.PostCreateBusinessClient(ctx, request)
+}
+
+func (mw *validationMiddleware) GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
+	return mw.next.GetListAllScopes(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -1103,4 +1126,25 @@ func (mw *authenticationMiddleware) PostCreateBusinessClient(ctx context.Context
 	}
 
 	return mw.next.PostCreateBusinessClient(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"scopes:read"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetListAllScopes(ctx, request)
 }

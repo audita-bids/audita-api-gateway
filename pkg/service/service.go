@@ -51,6 +51,7 @@ type Service interface {
 	GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error)
 	GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error)
 	PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
+	GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error)
 }
 
 type service struct {
@@ -385,6 +386,14 @@ func (s *service) PostCreateBusinessClient(ctx context.Context, r *model.Busines
 		Role:                     r.Role,
 		SendEmailAccess:          r.SendEmailAccess,
 		GenerateRandomicPassword: r.GenerateRandomicPassword,
+	})
+}
+
+func (s *service) GetListAllScopes(ctx context.Context, _ *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.clients.ListAllScopes(ctx, &client.ListAllScopesRequest{
+		OwnerId: user.Id,
 	})
 }
 

@@ -439,6 +439,25 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 				}),
 		))
 
+	r.Methods(http.MethodGet).
+		Path("/clients/scopes").
+		Handler(httptransport.NewServer(
+			endpoint.GetListAllScopes,
+			decodeScopeHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				}),
+		))
+
 	return r
 }
 
@@ -654,6 +673,12 @@ func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request i
 
 func decodeBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.BidRequest
+
+	return &req, nil
+}
+
+func decodeScopeHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.ScopeRequest
 
 	return &req, nil
 }
