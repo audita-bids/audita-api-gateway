@@ -109,11 +109,16 @@ type PlanRequest struct {
 	billings.PlanComplete
 }
 
-type ClientRequest struct{}
+type ClientRequest struct {
+}
 
 type ScopeRequest struct{}
 
 type BusinessClientRequest struct {
+	Id         string              `json:"id"`
+	Status     client.ClientStatus `json:"status"`
+	UpdateMask []string            `json:"update_mask"`
+
 	client.CreateBusinessClientRequest
 }
 

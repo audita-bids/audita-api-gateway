@@ -38,8 +38,8 @@ github.com/gorilla/mux v1.8.1/go.mod h1:AKf9I4AEqPTmMytcMc0KkNouC66V3BtZ4qD5fmWS
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/klauspost/cpuid/v2 v2.2.10 h1:tBs3QSyvjDyFTq3uoc/9xFpCuOsJQFNPiAhYdw2skhE=
 github.com/klauspost/cpuid/v2 v2.2.10/go.mod h1:hqwkgyIinND0mEev00jJYCxPNVRVXFQeu1XKlok6oO0=
-github.com/newdesksoftwares/private-kit v1.0.36 h1:jXlIbqCv4m1QJ4w+I8m2U9H4RBFvHghC8YMhQvuuyEg=
-github.com/newdesksoftwares/private-kit v1.0.36/go.mod h1:BaawqhvOXp9JSH+25Kn7VfL14U247wtURckCnHDG5uM=
+github.com/newdesksoftwares/private-kit v1.0.39 h1:zJIaKPCHlFCNAw1MeiT6axgQ6CYv/VoYcWnfRfH23Zg=
+github.com/newdesksoftwares/private-kit v1.0.39/go.mod h1:BaawqhvOXp9JSH+25Kn7VfL14U247wtURckCnHDG5uM=
 github.com/oklog/run v1.2.0 h1:O8x3yXwah4A73hJdlrwo/2X6J62gE5qTMusH0dvz60E=
 github.com/oklog/run v1.2.0/go.mod h1:mgDbKRSwPhJfesJ4PntqFUbKQRZ50NgmZTSPlFA0YFk=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

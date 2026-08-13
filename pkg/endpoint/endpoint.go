@@ -34,6 +34,8 @@ type EndpointSetup struct {
 	GetListAllUsers          endpoint.Endpoint
 	PostCreateBusinessClient endpoint.Endpoint
 	GetListAllScopes         endpoint.Endpoint
+	DeleteBusinessClient     endpoint.Endpoint
+	PatchBusinessClient      endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -58,7 +60,9 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetListUserPayments endpoint.Endpoint
 	var GetListAllUsers endpoint.Endpoint
 	var PostCreateBusinessClient endpoint.Endpoint
+	var DeleteBusinessClient endpoint.Endpoint
 	var GetListAllScopes endpoint.Endpoint
+	var PatchBusinessClient endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -151,6 +155,14 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListAllScopes = MakeGetListAllScopesEndpoint(s)
 		GetListAllScopes = loggingMiddleware("GetListAllScopes")(GetListAllScopes)
 		GetListAllScopes = metricsMiddleware("GetListAllScopes")(GetListAllScopes)
+
+		DeleteBusinessClient = MakeDeleteBusinessClientEndpoint(s)
+		DeleteBusinessClient = loggingMiddleware("DeleteBusinessClient")(DeleteBusinessClient)
+		DeleteBusinessClient = metricsMiddleware("DeleteBusinessClient")(DeleteBusinessClient)
+
+		PatchBusinessClient = MakePatchBusinessClientEndpoint(s)
+		PatchBusinessClient = loggingMiddleware("PatchBusinessClient")(PatchBusinessClient)
+		PatchBusinessClient = metricsMiddleware("PatchBusinessClient")(PatchBusinessClient)
 	}
 
 	return &EndpointSetup{
@@ -176,6 +188,8 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListAllUsers:          GetListAllUsers,
 		PostCreateBusinessClient: PostCreateBusinessClient,
 		GetListAllScopes:         GetListAllScopes,
+		DeleteBusinessClient:     DeleteBusinessClient,
+		PatchBusinessClient:      PatchBusinessClient,
 	}
 }
 
@@ -499,6 +513,34 @@ func MakeGetListAllScopesEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.ScopeRequest)
 
 		fc, err := s.GetListAllScopes(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeDeleteBusinessClientEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.BusinessClientRequest)
+
+		fc, err := s.DeleteBusinessClient(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePatchBusinessClientEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.BusinessClientRequest)
+
+		fc, err := s.PatchBusinessClient(ctx, r)
 
 		if err != nil {
 			return nil, err

@@ -16,6 +16,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type Middleware func(Service) Service
@@ -230,6 +231,24 @@ func (mw *loggingMiddleware) GetListAllScopes(ctx context.Context, request *mode
 
 	mw.logger.Log("method", "GetListAllScopes", "status", "started")
 	return mw.next.GetListAllScopes(ctx, request)
+}
+
+func (mw *loggingMiddleware) DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error) {
+	defer func() {
+		mw.logger.Log("method", "DeleteBusinessClient", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "DeleteBusinessClient", "status", "started")
+	return mw.next.DeleteBusinessClient(ctx, request)
+}
+
+func (mw *loggingMiddleware) PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PatchBusinessClient", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PatchBusinessClient", "status", "started")
+	return mw.next.PatchBusinessClient(ctx, request)
 }
 
 func RecoveryMiddleware(logger log.Logger) Middleware {
@@ -487,6 +506,28 @@ func (mw *recoveryMiddleware) GetListAllScopes(ctx context.Context, request *mod
 	return mw.next.GetListAllScopes(ctx, request)
 }
 
+func (mw *recoveryMiddleware) DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (resp *structpb.Struct, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "DeleteBusinessClient", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.DeleteBusinessClient(ctx, request)
+}
+
+func (mw *recoveryMiddleware) PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (resp *client.ClientComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PatchBusinessClient", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PatchBusinessClient(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -701,6 +742,32 @@ func (mw *validationMiddleware) PostCreateBusinessClient(ctx context.Context, re
 
 func (mw *validationMiddleware) GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
 	return mw.next.GetListAllScopes(ctx, request)
+}
+
+func (mw *validationMiddleware) DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error) {
+	schema := zog.Struct(zog.Shape{
+		"Id": zog.String().
+			Required(zog.Message("Id is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.DeleteBusinessClient(ctx, request)
+}
+
+func (mw *validationMiddleware) PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"Id": zog.String().
+			Required(zog.Message("Id is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PatchBusinessClient(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -1147,4 +1214,46 @@ func (mw *authenticationMiddleware) GetListAllScopes(ctx context.Context, reques
 	}
 
 	return mw.next.GetListAllScopes(ctx, request)
+}
+
+func (mw *authenticationMiddleware) DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"client:create"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.DeleteBusinessClient(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"client:update"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PatchBusinessClient(ctx, request)
 }

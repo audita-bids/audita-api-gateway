@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/newdesksoftwares/private-kit/decode"
 	"github.com/newdesksoftwares/private-kit/keys"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 	"github.com/newdesksoftwares/private-kit/query"
@@ -417,13 +418,55 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 							Value:  request.Header.Get("Authorization"),
 						},
 					})
-				}),
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, enrichListAllUsersFilter)
+				},
+			),
 		))
 
 	r.Methods(http.MethodPost).
 		Path("/clients/business").
 		Handler(httptransport.NewServer(
 			endpoint.PostCreateBusinessClient,
+			decodeBusinessClientHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, request *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, request, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  request.Header.Get("Authorization"),
+						},
+					})
+				}),
+		))
+
+	r.Methods(http.MethodDelete).
+		Path("/clients/business/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.DeleteBusinessClient,
+			decodeDeleteBusinessClientHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, request *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, request, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  request.Header.Get("Authorization"),
+						},
+					})
+				}),
+		))
+
+	r.Methods(http.MethodPatch).
+		Path("/clients/business/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.PatchBusinessClient,
 			decodeBusinessClientHTTP,
 			encodeHttpResponse,
 			httptransport.ServerErrorEncoder(encodeError),
@@ -455,7 +498,11 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 							Value:  r.Header.Get("Authorization"),
 						},
 					})
-				}),
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, nil)
+				},
+			),
 		))
 
 	return r
@@ -683,6 +730,15 @@ func decodeScopeHTTP(ctx context.Context, r *http.Request) (request interface{},
 	return &req, nil
 }
 
+func decodeDeleteBusinessClientHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.BusinessClientRequest
+	vars := mux.Vars(r)
+
+	req.Id = vars["id"]
+
+	return &req, nil
+}
+
 func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
 	var req model.BidRequest
 	vars := mux.Vars(r)
@@ -750,6 +806,33 @@ func enrichListHoldingBidFilter(ctx context.Context, r *http.Request, filter *qu
 				Value: endValue,
 			})
 		}
+	}
+}
+
+func enrichListAllUsersFilter(ctx context.Context, r *http.Request, filter *query.Filter) {
+	q := r.URL.Query()
+
+	matchFields := []string{
+		"status",
+		"client_id",
+	}
+
+	for _, field := range matchFields {
+		if value, ok := decode.RetrieveQueryValue(q, field); ok {
+			filter.Matches = append(filter.Matches, query.Match{
+				Key:   field,
+				Op:    "eq",
+				Value: value,
+			})
+		}
+	}
+
+	if _, ok := decode.RetrieveQueryValue(q, "status"); !ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "status",
+			Op:    "ne",
+			Value: strconv.Itoa(int(client.ClientStatus_SoftDeleted)),
+		})
 	}
 }
 

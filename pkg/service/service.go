@@ -1,7 +1,7 @@
 package service
 
 import (
-	"audita-api-gateway/request"
+	model "audita-api-gateway/request"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -26,6 +26,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 	"github.com/newdesksoftwares/private-kit/query"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/structpb"
 	"resty.dev/v3"
 )
 
@@ -52,6 +53,8 @@ type Service interface {
 	GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error)
 	PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
 	GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error)
+	DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error)
+	PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
 }
 
 type service struct {
@@ -367,8 +370,9 @@ func (s *service) GetListUserPayments(ctx context.Context, _ *model.PaymentReque
 
 func (s *service) GetListAllUsers(ctx context.Context, _ *model.ClientRequest) (*client.ListAllClientsResponse, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+	filter, _ := decode.GetFromContext[query.Filter](ctx, keys.FilterContext)
 
-	return s.clients.ListAll(ctx, &client.ListAllClientsRequest{
+	return s.clients.ListAll(genericListFilter(ctx, &filter), &client.ListAllClientsRequest{
 		OwnerId: user.Id,
 	})
 }
@@ -391,10 +395,26 @@ func (s *service) PostCreateBusinessClient(ctx context.Context, r *model.Busines
 
 func (s *service) GetListAllScopes(ctx context.Context, _ *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+	filter, _ := decode.GetFromContext[query.Filter](ctx, "filter")
 
-	return s.clients.ListAllScopes(ctx, &client.ListAllScopesRequest{
+	return s.clients.ListAllScopes(genericListFilter(ctx, &filter), &client.ListAllScopesRequest{
 		OwnerId: user.Id,
 	})
+}
+
+func (s *service) DeleteBusinessClient(ctx context.Context, r *model.BusinessClientRequest) (*structpb.Struct, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.clients.DeleteBusinessClient(ctx, &client.DeleteBusinessClientRequest{
+		UserId:  r.Id,
+		OwnerId: user.Id,
+	})
+}
+
+func (s *service) PatchBusinessClient(ctx context.Context, r *model.BusinessClientRequest) (*client.ClientComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.clients.PatchBusinessClient(ctx, BuildPatchBusinessClient(user, r))
 }
 
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {
