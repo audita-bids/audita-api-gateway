@@ -19,6 +19,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/newdesksoftwares/private-kit/decode"
 	"github.com/newdesksoftwares/private-kit/keys"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
@@ -505,6 +506,29 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodGet).
+		Path("/automations").
+		Handler(httptransport.NewServer(
+			endpoint.ListAutomations,
+			decodeListAutomationsHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.DecodeQueryFilterToContext(ctx, r, enrichAutomationFilter)
+				},
+			),
+		))
+
 	return r
 }
 
@@ -748,13 +772,31 @@ func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}
 	return &req, nil
 }
 
+func decodeListAutomationsHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.AutomationsRequest
+
+	query := r.URL.Query()
+
+	if value, ok := decode.RetrieveQueryValue(query, "type"); ok {
+		if converted, err := strconv.Atoi(value); err == nil {
+			req.Type = automations.AutomationType(converted)
+		}
+	}
+
+	if value, ok := decode.RetrieveQueryValue(query, "status"); ok {
+		if converted, err := strconv.Atoi(value); err == nil {
+			req.Status = automations.AutomationStatus(converted)
+		}
+	}
+
+	return &req, nil
+}
+
 func encodeHttpResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(response)
 }
 
-// encodeError turns every endpoint or decode failure into the sanitized JSON
-// body the client is allowed to see.
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	writeError(w, apperrors.ParseError(err))
 }
@@ -919,6 +961,26 @@ func enrichListBidFilter(ctx context.Context, r *http.Request, filter *query.Fil
 		filter.Matches = append(filter.Matches, query.Match{
 			Key:   "proposal_closing_date",
 			Op:    "gte",
+			Value: value,
+		})
+	}
+}
+
+func enrichAutomationFilter(ctx context.Context, r *http.Request, filter *query.Filter) {
+	q := r.URL.Query()
+
+	if value, ok := decode.RetrieveQueryValue(q, "month"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "month",
+			Op:    "eq",
+			Value: value,
+		})
+	}
+
+	if value, ok := decode.RetrieveQueryValue(q, "year"); ok {
+		filter.Matches = append(filter.Matches, query.Match{
+			Key:   "year",
+			Op:    "eq",
 			Value: value,
 		})
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/decode"
 	"github.com/newdesksoftwares/private-kit/keys"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
@@ -55,18 +56,20 @@ type Service interface {
 	GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error)
 	DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error)
 	PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
+	ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error)
 }
 
 type service struct {
 	cdnApi *resty.Client
 	logger log.Logger
 
-	pncp       pncp.PncpServiceClient
-	clients    client.ClientServiceClient
-	bids       bids.BidsServiceClient
-	agents     agents.AgentsServiceClient
-	whitelabel whitelabel.WhitelabelServiceClient
-	billings   billings.BillingServiceClient
+	pncp        pncp.PncpServiceClient
+	clients     client.ClientServiceClient
+	bids        bids.BidsServiceClient
+	agents      agents.AgentsServiceClient
+	whitelabel  whitelabel.WhitelabelServiceClient
+	billings    billings.BillingServiceClient
+	automations automations.AutomationsServiceClient
 }
 
 func NewService(logger log.Logger) Service {
@@ -76,14 +79,15 @@ func NewService(logger log.Logger) Service {
 	var svc Service
 	{
 		svc = &service{
-			cdnApi:     resty.New().SetBaseURL(cdn).SetRetryCount(2), // will do 2 retries
-			logger:     logger,
-			pncp:       pncp.NewPncpServiceClient(connectors.Pncp()),
-			bids:       bids.NewBidsServiceClient(connectors.Bids()),
-			clients:    clients,
-			agents:     agents.NewAgentsServiceClient(connectors.Agents()),
-			whitelabel: whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
-			billings:   billings.NewBillingServiceClient(connectors.Billings()),
+			cdnApi:      resty.New().SetBaseURL(cdn).SetRetryCount(2), // will do 2 retries
+			logger:      logger,
+			pncp:        pncp.NewPncpServiceClient(connectors.Pncp()),
+			bids:        bids.NewBidsServiceClient(connectors.Bids()),
+			clients:     clients,
+			agents:      agents.NewAgentsServiceClient(connectors.Agents()),
+			whitelabel:  whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
+			billings:    billings.NewBillingServiceClient(connectors.Billings()),
+			automations: automations.NewAutomationsServiceClient(connectors.Automations()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
@@ -415,6 +419,16 @@ func (s *service) PatchBusinessClient(ctx context.Context, r *model.BusinessClie
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
 
 	return s.clients.PatchBusinessClient(ctx, BuildPatchBusinessClient(user, r))
+}
+
+func (s *service) ListAutomations(ctx context.Context, r *model.AutomationsRequest) (*automations.ListAutomationsResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.automations.ListAutomations(ctx, &automations.ListAutomationsRequest{
+		UserId: user.Id,
+		Type:   r.Type,
+		Status: r.Status,
+	})
 }
 
 func (s *service) uploadFile(file io.Reader, fieldName string) (string, error) {

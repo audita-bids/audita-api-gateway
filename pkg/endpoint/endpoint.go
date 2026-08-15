@@ -36,6 +36,7 @@ type EndpointSetup struct {
 	GetListAllScopes         endpoint.Endpoint
 	DeleteBusinessClient     endpoint.Endpoint
 	PatchBusinessClient      endpoint.Endpoint
+	ListAutomations          endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -63,6 +64,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var DeleteBusinessClient endpoint.Endpoint
 	var GetListAllScopes endpoint.Endpoint
 	var PatchBusinessClient endpoint.Endpoint
+	var ListAutomations endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -163,6 +165,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PatchBusinessClient = MakePatchBusinessClientEndpoint(s)
 		PatchBusinessClient = loggingMiddleware("PatchBusinessClient")(PatchBusinessClient)
 		PatchBusinessClient = metricsMiddleware("PatchBusinessClient")(PatchBusinessClient)
+
+		ListAutomations = MakeListAutomationsEndpoint(s)
+		ListAutomations = loggingMiddleware("ListAutomations")(ListAutomations)
+		ListAutomations = metricsMiddleware("ListAutomations")(ListAutomations)
 	}
 
 	return &EndpointSetup{
@@ -190,6 +196,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListAllScopes:         GetListAllScopes,
 		DeleteBusinessClient:     DeleteBusinessClient,
 		PatchBusinessClient:      PatchBusinessClient,
+		ListAutomations:          ListAutomations,
 	}
 }
 
@@ -541,6 +548,20 @@ func MakePatchBusinessClientEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.BusinessClientRequest)
 
 		fc, err := s.PatchBusinessClient(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeListAutomationsEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.AutomationsRequest)
+
+		fc, err := s.ListAutomations(ctx, r)
 
 		if err != nil {
 			return nil, err

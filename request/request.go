@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
@@ -120,6 +121,11 @@ type BusinessClientRequest struct {
 	UpdateMask []string            `json:"update_mask"`
 
 	client.CreateBusinessClientRequest
+}
+
+type AutomationsRequest struct {
+	Type   automations.AutomationType   `json:"type"`
+	Status automations.AutomationStatus `json:"status"`
 }
 
 type CdnResponse struct {

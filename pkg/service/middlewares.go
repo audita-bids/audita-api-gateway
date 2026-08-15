@@ -11,6 +11,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/decode"
 	"github.com/newdesksoftwares/private-kit/middlewares"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
@@ -249,6 +250,15 @@ func (mw *loggingMiddleware) PatchBusinessClient(ctx context.Context, request *m
 
 	mw.logger.Log("method", "PatchBusinessClient", "status", "started")
 	return mw.next.PatchBusinessClient(ctx, request)
+}
+
+func (mw *loggingMiddleware) ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "ListAutomations", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "ListAutomations", "status", "started")
+	return mw.next.ListAutomations(ctx, request)
 }
 
 func RecoveryMiddleware(logger log.Logger) Middleware {
@@ -528,6 +538,17 @@ func (mw *recoveryMiddleware) PatchBusinessClient(ctx context.Context, request *
 	return mw.next.PatchBusinessClient(ctx, request)
 }
 
+func (mw *recoveryMiddleware) ListAutomations(ctx context.Context, request *model.AutomationsRequest) (resp *automations.ListAutomationsResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "ListAutomations", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.ListAutomations(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -768,6 +789,10 @@ func (mw *validationMiddleware) PatchBusinessClient(ctx context.Context, request
 	}
 
 	return mw.next.PatchBusinessClient(ctx, request)
+}
+
+func (mw *validationMiddleware) ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error) {
+	return mw.next.ListAutomations(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -1256,4 +1281,22 @@ func (mw *authenticationMiddleware) PatchBusinessClient(ctx context.Context, req
 	}
 
 	return mw.next.PatchBusinessClient(ctx, request)
+}
+
+func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:read"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.ListAutomations(ctx, request)
 }
