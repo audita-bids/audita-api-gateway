@@ -16,6 +16,10 @@
 # ciclo do front (monthly/yearly) é um plano próprio. `metadata.family`
 # agrupa os dois ciclos do mesmo tier e `metadata.cycle` diz qual é qual.
 #
+# `metadata.payer_role` é o tier que o pagamento aprovado concede no client
+# (enum PayerRole: Free | Basic | Pro | Enterprise). Sem ele, o client cai no
+# fallback pelo `type` do plano — PLAN_TYPE_PAID vira Basic.
+#
 # O campo `provider` foi omitido de propósito: o id do preapproval_plan do
 # Mercado Pago só existe depois de criado lá. Preencha com o id real antes
 # de cobrar — um id errado cobra o valor errado.
@@ -41,6 +45,7 @@ Content-Type: application/json
   "metadata": {
     "family": "essencial",
     "cycle": "monthly",
+    "payer_role": "Basic",
     "tier_order": "1",
     "recommended": "false",
     "upsell": "Sem a análise por IA, cada edital leva de 20 a 40 minutos de leitura manual.",
@@ -79,6 +84,7 @@ Content-Type: application/json
   "metadata": {
     "family": "essencial",
     "cycle": "yearly",
+    "payer_role": "Basic",
     "tier_order": "1",
     "recommended": "false",
     "monthly_equivalent_in_cents": "3325",
@@ -119,6 +125,7 @@ Content-Type: application/json
   "metadata": {
     "family": "comando",
     "cycle": "monthly",
+    "payer_role": "Pro",
     "tier_order": "2",
     "recommended": "true",
     "benefit_1": "Tudo do Essencial",
@@ -154,6 +161,7 @@ Content-Type: application/json
   "metadata": {
     "family": "comando",
     "cycle": "yearly",
+    "payer_role": "Pro",
     "tier_order": "2",
     "recommended": "true",
     "monthly_equivalent_in_cents": "7492",
@@ -191,6 +199,7 @@ Content-Type: application/json
   "metadata": {
     "family": "enterprise",
     "cycle": "custom",
+    "payer_role": "Enterprise",
     "tier_order": "3",
     "recommended": "false",
     "contact_only": "true",

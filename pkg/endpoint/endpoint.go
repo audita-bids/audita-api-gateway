@@ -28,6 +28,7 @@ type EndpointSetup struct {
 	PostBidProposal          endpoint.Endpoint
 	UpdateBidProposal        endpoint.Endpoint
 	PostPayment              endpoint.Endpoint
+	CancelPayment            endpoint.Endpoint
 	PostPlan                 endpoint.Endpoint
 	GetListPlans             endpoint.Endpoint
 	GetListUserPayments      endpoint.Endpoint
@@ -56,6 +57,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PostBidProposal endpoint.Endpoint
 	var UpdateBidProposal endpoint.Endpoint
 	var PostPayment endpoint.Endpoint
+	var CancelPayment endpoint.Endpoint
 	var PostPlan endpoint.Endpoint
 	var GetListPlans endpoint.Endpoint
 	var GetListUserPayments endpoint.Endpoint
@@ -134,6 +136,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostPayment = loggingMiddleware("PostPayment")(PostPayment)
 		PostPayment = metricsMiddleware("PostPayment")(PostPayment)
 
+		CancelPayment = MakeCancelPaymentEndpoint(s)
+		CancelPayment = loggingMiddleware("CancelPayment")(CancelPayment)
+		CancelPayment = metricsMiddleware("CancelPayment")(CancelPayment)
+
 		GetListPlans = MakeGetListPlansEndpoint(s)
 		GetListPlans = loggingMiddleware("GetListPlans")(GetListPlans)
 		GetListPlans = metricsMiddleware("GetListPlans")(GetListPlans)
@@ -188,6 +194,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostBidProposal:          PostBidProposal,
 		UpdateBidProposal:        UpdateBidProposal,
 		PostPayment:              PostPayment,
+		CancelPayment:            CancelPayment,
 		PostPlan:                 PostPlan,
 		GetListPlans:             GetListPlans,
 		GetListUserPayments:      GetListUserPayments,
@@ -433,6 +440,20 @@ func MakePostPaymentEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.PaymentRequest)
 
 		fc, err := s.PostPayment(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeCancelPaymentEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.PaymentRequest)
+
+		fc, err := s.CancelPayment(ctx, r)
 
 		if err != nil {
 			return nil, err

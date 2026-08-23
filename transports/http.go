@@ -344,6 +344,26 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 		))
 
 	r.Methods(http.MethodPost).
+		Path("/billings/payment/{id}/cancel").
+		Handler(httptransport.NewServer(
+			endpoint.CancelPayment,
+			decodeCancelPaymentHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPost).
 		Path("/billings/plans").
 		Handler(httptransport.NewServer(
 			endpoint.PostPlan,
@@ -682,6 +702,15 @@ func decodePaymentHTTP(ctx context.Context, r *http.Request) (request interface{
 	if err != nil {
 		return nil, err
 	}
+
+	return &req, nil
+}
+
+func decodeCancelPaymentHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.PaymentRequest
+	vars := mux.Vars(r)
+
+	req.Id = vars["id"]
 
 	return &req, nil
 }

@@ -148,11 +148,29 @@ func classify(message string) *HTTPError {
 			Code:    "unauthorized",
 			Message: "unauthorized",
 		}
+	case containsAny(msg, []string{"insufficient scopes for payer"}):
+		return &HTTPError{
+			Status:  http.StatusForbidden,
+			Code:    "plan_required",
+			Message: "your plan does not include this feature",
+		}
 	case containsAny(msg, []string{"insufficient scopes", "permission denied", "access denied"}):
 		return &HTTPError{
 			Status:  http.StatusForbidden,
 			Code:    "forbidden",
 			Message: "insufficient permissions",
+		}
+	case containsAny(msg, []string{"payment does not belong to the user"}):
+		return &HTTPError{
+			Status:  http.StatusForbidden,
+			Code:    "forbidden",
+			Message: "insufficient permissions",
+		}
+	case containsAny(msg, []string{"payment is not cancellable"}):
+		return &HTTPError{
+			Status:  http.StatusConflict,
+			Code:    "payment_not_cancellable",
+			Message: "payment is not cancellable",
 		}
 	case containsAny(msg, []string{"already exists", "duplicate"}):
 		return &HTTPError{

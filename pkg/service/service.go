@@ -48,6 +48,7 @@ type Service interface {
 	PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error)
 	PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error)
+	CancelPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostCancelPaymentResponse, error)
 	PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error)
 	GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error)
 	GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error)
@@ -338,6 +339,15 @@ func (s *service) PostPayment(ctx context.Context, request *model.PaymentRequest
 		CallbackUrl:             request.CallbackUrl,
 		CouponCode:              request.CouponCode,
 		Metadata:                request.Metadata,
+	})
+}
+
+func (s *service) CancelPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostCancelPaymentResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.billings.CancelPayment(ctx, &billings.PostCancelPaymentRequest{
+		Id:     request.Id,
+		UserId: user.Id,
 	})
 }
 

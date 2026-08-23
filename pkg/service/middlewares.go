@@ -180,6 +180,15 @@ func (mw *loggingMiddleware) PostPayment(ctx context.Context, request *model.Pay
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *loggingMiddleware) CancelPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostCancelPaymentResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "CancelPayment", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "CancelPayment", "status", "started")
+	return mw.next.CancelPayment(ctx, request)
+}
+
 func (mw *loggingMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
 	defer func() {
 		mw.logger.Log("method", "PostPlan", "status", "completed")
@@ -451,6 +460,17 @@ func (mw *recoveryMiddleware) PostPayment(ctx context.Context, request *model.Pa
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *recoveryMiddleware) CancelPayment(ctx context.Context, request *model.PaymentRequest) (resp *billings.PostCancelPaymentResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "CancelPayment", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.CancelPayment(ctx, request)
+}
+
 func (mw *recoveryMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (resp *billings.PlanComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -716,6 +736,18 @@ func (mw *validationMiddleware) PostPayment(ctx context.Context, request *model.
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *validationMiddleware) CancelPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostCancelPaymentResponse, error) {
+	schema := zog.Struct(zog.Shape{
+		"Id": zog.String().Required(zog.Message("Payment ID is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.CancelPayment(ctx, request)
+}
+
 func (mw *validationMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
 	return mw.next.GetListPlans(ctx, request)
 }
@@ -793,6 +825,11 @@ func (mw *validationMiddleware) PatchBusinessClient(ctx context.Context, request
 
 func (mw *validationMiddleware) ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error) {
 	return mw.next.ListAutomations(ctx, request)
+}
+
+var comandoPlans = []client.PayerRole{
+	client.PayerRole_Pro,
+	client.PayerRole_Enterprise,
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -891,7 +928,8 @@ func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *m
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"ai:write"},
+		Scopes:    []string{"ai:write"},
+		PayerRole: comandoPlans,
 	})
 
 	if err != nil {
@@ -946,7 +984,8 @@ func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request 
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"whitelabel:write"},
+		Scopes:    []string{"whitelabel:write"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 			client.ClientRole_Admin,
@@ -968,7 +1007,8 @@ func (mw *authenticationMiddleware) GetWhitelabel(ctx context.Context, request *
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"whitelabel:read"},
+		Scopes:    []string{"whitelabel:read"},
+		PayerRole: comandoPlans,
 	})
 
 	if err != nil {
@@ -986,7 +1026,8 @@ func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, reques
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"whitelabel:write"},
+		Scopes:    []string{"whitelabel:write"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 			client.ClientRole_Admin,
@@ -1111,6 +1152,28 @@ func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *mo
 	return mw.next.PostPayment(ctx, request)
 }
 
+func (mw *authenticationMiddleware) CancelPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostCancelPaymentResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"payments:write"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+			client.ClientRole_SuperAdmin,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.CancelPayment(ctx, request)
+}
+
 func (mw *authenticationMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
 	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
 
@@ -1186,7 +1249,8 @@ func (mw *authenticationMiddleware) GetListAllUsers(ctx context.Context, request
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"clients:read"},
+		Scopes:    []string{"clients:read"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1207,7 +1271,8 @@ func (mw *authenticationMiddleware) PostCreateBusinessClient(ctx context.Context
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"client:create"},
+		Scopes:    []string{"client:create"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1228,7 +1293,8 @@ func (mw *authenticationMiddleware) GetListAllScopes(ctx context.Context, reques
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"scopes:read"},
+		Scopes:    []string{"scopes:read"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1249,7 +1315,8 @@ func (mw *authenticationMiddleware) DeleteBusinessClient(ctx context.Context, re
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"client:create"},
+		Scopes:    []string{"client:create"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1270,7 +1337,8 @@ func (mw *authenticationMiddleware) PatchBusinessClient(ctx context.Context, req
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"client:update"},
+		Scopes:    []string{"client:update"},
+		PayerRole: comandoPlans,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1291,7 +1359,8 @@ func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:read"},
+		Scopes:    []string{"bids:read"},
+		PayerRole: comandoPlans,
 	})
 
 	if err != nil {
