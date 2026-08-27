@@ -23,6 +23,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/coupons"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 	"github.com/newdesksoftwares/private-kit/query"
@@ -58,6 +59,7 @@ type Service interface {
 	DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error)
 	PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
 	ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error)
+	GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error)
 }
 
 type service struct {
@@ -71,6 +73,7 @@ type service struct {
 	whitelabel  whitelabel.WhitelabelServiceClient
 	billings    billings.BillingServiceClient
 	automations automations.AutomationsServiceClient
+	coupons     coupons.CouponsServiceClient
 }
 
 func NewService(logger log.Logger) Service {
@@ -89,6 +92,7 @@ func NewService(logger log.Logger) Service {
 			whitelabel:  whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
 			billings:    billings.NewBillingServiceClient(connectors.Billings()),
 			automations: automations.NewAutomationsServiceClient(connectors.Automations()),
+			coupons:     coupons.NewCouponsServiceClient(connectors.Coupons()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
@@ -438,6 +442,15 @@ func (s *service) ListAutomations(ctx context.Context, r *model.AutomationsReque
 		UserId: user.Id,
 		Type:   r.Type,
 		Status: r.Status,
+	})
+}
+
+func (s *service) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.coupons.GetAndValidateCoupon(ctx, &coupons.GetAndValidateCouponRequest{
+		Code:   request.Code,
+		UserId: user.Id,
 	})
 }
 

@@ -549,6 +549,26 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodGet).
+		Path("/coupons/search/{code}").
+		Handler(httptransport.NewServer(
+			endpoint.GetAndValidateCoupon,
+			decodeCouponHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	return r
 }
 
@@ -797,6 +817,15 @@ func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}
 	vars := mux.Vars(r)
 
 	req.Id = vars["id"]
+
+	return &req, nil
+}
+
+func decodeCouponHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.CouponRequest
+	vars := mux.Vars(r)
+
+	req.Code = vars["code"]
 
 	return &req, nil
 }

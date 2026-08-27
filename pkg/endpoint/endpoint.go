@@ -38,6 +38,7 @@ type EndpointSetup struct {
 	DeleteBusinessClient     endpoint.Endpoint
 	PatchBusinessClient      endpoint.Endpoint
 	ListAutomations          endpoint.Endpoint
+	GetAndValidateCoupon     endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -67,6 +68,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetListAllScopes endpoint.Endpoint
 	var PatchBusinessClient endpoint.Endpoint
 	var ListAutomations endpoint.Endpoint
+	var GetAndValidateCoupon endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -175,6 +177,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		ListAutomations = MakeListAutomationsEndpoint(s)
 		ListAutomations = loggingMiddleware("ListAutomations")(ListAutomations)
 		ListAutomations = metricsMiddleware("ListAutomations")(ListAutomations)
+
+		GetAndValidateCoupon = MakeGetAndValidateCouponEndpoint(s)
+		GetAndValidateCoupon = loggingMiddleware("GetAndValidateCoupon")(GetAndValidateCoupon)
+		GetAndValidateCoupon = metricsMiddleware("GetAndValidateCoupon")(GetAndValidateCoupon)
 	}
 
 	return &EndpointSetup{
@@ -204,6 +210,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		DeleteBusinessClient:     DeleteBusinessClient,
 		PatchBusinessClient:      PatchBusinessClient,
 		ListAutomations:          ListAutomations,
+		GetAndValidateCoupon:     GetAndValidateCoupon,
 	}
 }
 
@@ -583,6 +590,20 @@ func MakeListAutomationsEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.AutomationsRequest)
 
 		fc, err := s.ListAutomations(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetAndValidateCouponEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CouponRequest)
+
+		fc, err := s.GetAndValidateCoupon(ctx, r)
 
 		if err != nil {
 			return nil, err

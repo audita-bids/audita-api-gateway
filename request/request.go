@@ -128,6 +128,10 @@ type AutomationsRequest struct {
 	Status automations.AutomationStatus `json:"status"`
 }
 
+type CouponRequest struct {
+	Code string `json:"code"`
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
 }
@@ -181,6 +185,10 @@ func (p *PlanRequest) Decode(r *http.Request) error {
 }
 
 func (b *BusinessClientRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(b)
+}
+
+func (b *CouponRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(b)
 }
 

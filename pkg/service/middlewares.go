@@ -15,6 +15,7 @@ import (
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
+	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/coupons"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -268,6 +269,15 @@ func (mw *loggingMiddleware) ListAutomations(ctx context.Context, request *model
 
 	mw.logger.Log("method", "ListAutomations", "status", "started")
 	return mw.next.ListAutomations(ctx, request)
+}
+
+func (mw *loggingMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "GetAndValidateCoupon", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetAndValidateCoupon", "status", "started")
+	return mw.next.GetAndValidateCoupon(ctx, request)
 }
 
 func RecoveryMiddleware(logger log.Logger) Middleware {
@@ -569,6 +579,17 @@ func (mw *recoveryMiddleware) ListAutomations(ctx context.Context, request *mode
 	return mw.next.ListAutomations(ctx, request)
 }
 
+func (mw *recoveryMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (result *coupons.CouponComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetAndValidateCoupon", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.GetAndValidateCoupon(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -827,9 +848,17 @@ func (mw *validationMiddleware) ListAutomations(ctx context.Context, request *mo
 	return mw.next.ListAutomations(ctx, request)
 }
 
-var comandoPlans = []client.PayerRole{
-	client.PayerRole_Pro,
-	client.PayerRole_Enterprise,
+func (mw *validationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"code": zog.String().
+			Required(zog.Message("Code is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.GetAndValidateCoupon(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -840,6 +869,12 @@ func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceCli
 			clients: clients,
 		}
 	}
+}
+
+var genericPayers = []client.PayerRole{
+	client.PayerRole_Pro,
+	client.PayerRole_Enterprise,
+	client.PayerRole_FreeTasting,
 }
 
 type authenticationMiddleware struct {
@@ -929,7 +964,7 @@ func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *m
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"ai:write"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -985,7 +1020,7 @@ func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request 
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"whitelabel:write"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 			client.ClientRole_Admin,
@@ -1008,7 +1043,7 @@ func (mw *authenticationMiddleware) GetWhitelabel(ctx context.Context, request *
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"whitelabel:read"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -1027,7 +1062,7 @@ func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, reques
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"whitelabel:write"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 			client.ClientRole_Admin,
@@ -1250,7 +1285,7 @@ func (mw *authenticationMiddleware) GetListAllUsers(ctx context.Context, request
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"clients:read"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1272,7 +1307,7 @@ func (mw *authenticationMiddleware) PostCreateBusinessClient(ctx context.Context
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"client:create"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1294,7 +1329,7 @@ func (mw *authenticationMiddleware) GetListAllScopes(ctx context.Context, reques
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"scopes:read"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1316,7 +1351,7 @@ func (mw *authenticationMiddleware) DeleteBusinessClient(ctx context.Context, re
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"client:create"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1338,7 +1373,7 @@ func (mw *authenticationMiddleware) PatchBusinessClient(ctx context.Context, req
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"client:update"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 		},
@@ -1360,7 +1395,7 @@ func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"bids:read"},
-		PayerRole: comandoPlans,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -1368,4 +1403,22 @@ func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request
 	}
 
 	return mw.next.ListAutomations(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"coupons:read"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetAndValidateCoupon(ctx, request)
 }

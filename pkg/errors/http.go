@@ -172,6 +172,29 @@ func classify(message string) *HTTPError {
 			Code:    "payment_not_cancellable",
 			Message: "payment is not cancellable",
 		}
+	// Coupons are classified before the generic rules below on purpose:
+	// "coupon not found" would otherwise be flattened into the catch-all 404,
+	// and the checkout could not tell an unknown code from an expired campaign
+	// or from one whose uses ran out. Each of those is a different sentence to
+	// the buyer, so each gets its own code.
+	case containsAny(msg, []string{"coupon expired"}):
+		return &HTTPError{
+			Status:  http.StatusGone,
+			Code:    "coupon_expired",
+			Message: "coupon expired",
+		}
+	case containsAny(msg, []string{"coupon max uses reached"}):
+		return &HTTPError{
+			Status:  http.StatusConflict,
+			Code:    "coupon_exhausted",
+			Message: "coupon max uses reached",
+		}
+	case containsAny(msg, []string{"coupon not found", "coupon is invalid"}):
+		return &HTTPError{
+			Status:  http.StatusNotFound,
+			Code:    "coupon_not_found",
+			Message: "coupon not found",
+		}
 	case containsAny(msg, []string{"already exists", "duplicate"}):
 		return &HTTPError{
 			Status:  http.StatusConflict,
