@@ -549,6 +549,26 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodDelete).
+		Path("/bids/favorites/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.DeleteFavoriteBid,
+			decodeDeleteFavoriteBidHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	r.Methods(http.MethodGet).
 		Path("/coupons/search/{code}").
 		Handler(httptransport.NewServer(
@@ -658,6 +678,15 @@ func decodePostFavoriteBidHTTP(ctx context.Context, r *http.Request) (request in
 	if err != nil {
 		return nil, err
 	}
+
+	return &req, nil
+}
+
+func decodeDeleteFavoriteBidHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.FavoriteBidRequest
+
+	vars := mux.Vars(r)
+	req.Id = vars["id"]
 
 	return &req, nil
 }

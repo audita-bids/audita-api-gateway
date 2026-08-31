@@ -16,6 +16,7 @@ type EndpointSetup struct {
 	GetLicense               endpoint.Endpoint
 	GetListFavoriteBid       endpoint.Endpoint
 	PostFavoriteBid          endpoint.Endpoint
+	DeleteFavoriteBid        endpoint.Endpoint
 	PostAnalysis             endpoint.Endpoint
 	PostHoldingBid           endpoint.Endpoint
 	GetListHoldingBid        endpoint.Endpoint
@@ -69,6 +70,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PatchBusinessClient endpoint.Endpoint
 	var ListAutomations endpoint.Endpoint
 	var GetAndValidateCoupon endpoint.Endpoint
+	var DeleteFavoriteBid endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
 	metricsMiddleware := middlewares.MetricsMiddleware("audita-api-gateway")
@@ -181,6 +183,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetAndValidateCoupon = MakeGetAndValidateCouponEndpoint(s)
 		GetAndValidateCoupon = loggingMiddleware("GetAndValidateCoupon")(GetAndValidateCoupon)
 		GetAndValidateCoupon = metricsMiddleware("GetAndValidateCoupon")(GetAndValidateCoupon)
+
+		DeleteFavoriteBid = MakeDeleteFavoriteBidEndpoint(s)
+		DeleteFavoriteBid = loggingMiddleware("DeleteFavoriteBid")(DeleteFavoriteBid)
+		DeleteFavoriteBid = metricsMiddleware("DeleteFavoriteBid")(DeleteFavoriteBid)
 	}
 
 	return &EndpointSetup{
@@ -211,6 +217,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PatchBusinessClient:      PatchBusinessClient,
 		ListAutomations:          ListAutomations,
 		GetAndValidateCoupon:     GetAndValidateCoupon,
+		DeleteFavoriteBid:        DeleteFavoriteBid,
 	}
 }
 
@@ -604,6 +611,20 @@ func MakeGetAndValidateCouponEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.CouponRequest)
 
 		fc, err := s.GetAndValidateCoupon(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeDeleteFavoriteBidEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.FavoriteBidRequest)
+
+		fc, err := s.DeleteFavoriteBid(ctx, r)
 
 		if err != nil {
 			return nil, err

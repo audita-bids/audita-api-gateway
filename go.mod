@@ -1,13 +1,13 @@
 module audita-api-gateway
 
-go 1.25.0
+go 1.27.0
 
 require (
 	github.com/Oudwins/zog v0.22.1
 	github.com/go-kit/kit v0.13.0
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1
-	github.com/newdesksoftwares/private-kit v1.0.51
+	github.com/newdesksoftwares/private-kit v1.0.52
 	github.com/oklog/run v1.2.0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.3
 	google.golang.org/grpc v1.79.3

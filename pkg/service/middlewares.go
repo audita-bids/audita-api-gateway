@@ -280,6 +280,15 @@ func (mw *loggingMiddleware) GetAndValidateCoupon(ctx context.Context, request *
 	return mw.next.GetAndValidateCoupon(ctx, request)
 }
 
+func (mw *loggingMiddleware) DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "DeleteFavoriteBid", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "DeleteFavoriteBid", "status", "started")
+	return mw.next.DeleteFavoriteBid(ctx, request)
+}
+
 func RecoveryMiddleware(logger log.Logger) Middleware {
 	return func(next Service) Service {
 		return &recoveryMiddleware{
@@ -590,6 +599,17 @@ func (mw *recoveryMiddleware) GetAndValidateCoupon(ctx context.Context, request 
 	return mw.next.GetAndValidateCoupon(ctx, request)
 }
 
+func (mw *recoveryMiddleware) DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (result *bids.DeleteFavoriteBidResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "DeleteFavoriteBid", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.DeleteFavoriteBid(ctx, request)
+}
+
 type validationMiddleware struct {
 	next   Service
 	logger log.Logger
@@ -859,6 +879,19 @@ func (mw *validationMiddleware) GetAndValidateCoupon(ctx context.Context, reques
 	}
 
 	return mw.next.GetAndValidateCoupon(ctx, request)
+}
+
+func (mw *validationMiddleware) DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error) {
+	schema := zog.Struct(zog.Shape{
+		"Id": zog.String().
+			Required(zog.Message("Id is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.DeleteFavoriteBid(ctx, request)
 }
 
 func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
@@ -1421,4 +1454,22 @@ func (mw *authenticationMiddleware) GetAndValidateCoupon(ctx context.Context, re
 	}
 
 	return mw.next.GetAndValidateCoupon(ctx, request)
+}
+
+func (mw *authenticationMiddleware) DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error) {
+	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"bids:delete"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.DeleteFavoriteBid(ctx, request)
 }

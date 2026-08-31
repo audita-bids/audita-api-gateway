@@ -36,6 +36,7 @@ type Service interface {
 	GetAvailableLicenses(ctx context.Context, request *pncp.PncpAvailableLicenseRequest) (*pncp.PncpAvailableLicenseResponse, error)
 	GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (*pncp.PncpFindLicenseResponse, error)
 	PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.PostFavoriteBidResponse, error)
+	DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error)
 	GetListFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.GetListFavoriteBidResponse, error)
 	PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error)
 	PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error)
@@ -118,6 +119,15 @@ func (s *service) PostFavoriteBid(ctx context.Context, request *model.FavoriteBi
 	return s.bids.PostFavoriteBid(ctx, &bids.PostFavoriteBidRequest{
 		UserId: request.UserId,
 		BidId:  request.BidId,
+	})
+}
+
+func (s *service) DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	return s.bids.DeleteFavoriteBid(ctx, &bids.DeleteFavoriteBidRequest{
+		Id:     request.Id,
+		UserId: user.Id,
 	})
 }
 
