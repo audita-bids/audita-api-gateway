@@ -11,22 +11,28 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	apperrors "audita-api-gateway/pkg/errors"
 
+	"audita-api-gateway/pkg/ratelimit"
+
+	"github.com/audita-bids/private-kit/decode"
+	"github.com/audita-bids/private-kit/keys"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/pncp"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/whitelabel"
+	"github.com/audita-bids/private-kit/query"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
-	"github.com/newdesksoftwares/private-kit/decode"
-	"github.com/newdesksoftwares/private-kit/keys"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
-	"github.com/newdesksoftwares/private-kit/query"
 	"go.elastic.co/apm/module/apmgorilla/v2"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc/metadata"
 )
+
+var analysisLimiter = ratelimit.New(rate.Every(6*time.Minute), 3, ratelimit.ByToken)
 
 func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Handler {
 	r := mux.NewRouter()
@@ -113,7 +119,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 
 	r.Methods(http.MethodPost).
 		Path("/{bid_id}/analysis").
-		Handler(httptransport.NewServer(
+		Handler(analysisLimiter.Middleware(httptransport.NewServer(
 			endpoint.PostAnalysis,
 			decodeAnalysisHTTP,
 			encodeHttpResponse,
@@ -129,7 +135,7 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 					})
 				},
 			),
-		))
+		)))
 
 	r.Methods(http.MethodPost).
 		Path("/holding-bid").
@@ -800,6 +806,8 @@ func decodeWhitelabelUpdateHTTP(ctx context.Context, r *http.Request) (request i
 	req.PrimaryColor = r.FormValue("primary_color")
 	req.SecondaryColor = r.FormValue("secondary_color")
 	req.AccentColor = r.FormValue("accent_color")
+	req.ClearFields = r.Form["clear_fields"]
+
 	if v := r.FormValue("theme"); v != "" {
 		if n, convErr := strconv.Atoi(v); convErr == nil {
 			req.Theme = whitelabel.Theme(n)

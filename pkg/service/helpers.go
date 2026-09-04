@@ -3,7 +3,7 @@ package service
 import (
 	model "audita-api-gateway/request"
 
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 

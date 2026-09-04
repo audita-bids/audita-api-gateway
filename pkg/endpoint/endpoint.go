@@ -5,10 +5,10 @@ import (
 	"audita-api-gateway/request"
 	"context"
 
+	"github.com/audita-bids/private-kit/middlewares"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/pncp"
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/log"
-	"github.com/newdesksoftwares/private-kit/middlewares"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
 )
 
 type EndpointSetup struct {

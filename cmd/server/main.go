@@ -7,14 +7,17 @@ import (
 	"net/http"
 	httpCaller "net/http"
 	"os"
+	"sync/atomic"
+	"syscall"
+	"time"
 
 	"audita-api-gateway/pkg/endpoint"
 	"audita-api-gateway/pkg/service"
 	"audita-api-gateway/transports"
 
+	"github.com/audita-bids/private-kit/middlewares"
+	"github.com/audita-bids/private-kit/pkg/lib"
 	"github.com/go-kit/kit/log/level"
-	"github.com/newdesksoftwares/private-kit/middlewares"
-	"github.com/newdesksoftwares/private-kit/pkg/lib"
 	"github.com/oklog/run"
 )
 
@@ -24,8 +27,15 @@ func main() {
 
 	logger := lib.SetupLogger(cfg.Debug)
 
+	redis, err := lib.Initiate()
+
+	if err != nil {
+		level.Error(logger).Log("msg", "failed to connect to redis", "err", err)
+		os.Exit(1)
+	}
+
 	var (
-		svc         = service.NewService(logger)
+		svc         = service.NewService(logger, middlewares.NewAuthCache(redis.Client))
 		endpoints   = endpoint.NewEndpointSetup(svc, logger)
 		httpHandler = transports.NewHTTPServer(*endpoints, logger)
 
@@ -51,6 +61,8 @@ func main() {
 		})
 	}
 
+	ready := new(atomic.Bool)
+
 	var g run.Group
 	{
 		httpListener, err := net.Listen("tcp", cfg.HttpAddr)
@@ -59,16 +71,25 @@ func main() {
 			os.Exit(1)
 		}
 
+		strip := http.StripPrefix("/api", httpHandler)
+
+		httpServer = &httpCaller.Server{
+			Handler:           f(strip),
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      120 * time.Second,
+			IdleTimeout:       120 * time.Second,
+		}
+
 		g.Add(func() error {
-			strip := http.StripPrefix("/api", httpHandler)
-
-			httpServer = &httpCaller.Server{
-				Handler: f(strip),
-			}
-
 			return httpServer.Serve(httpListener)
 		}, func(error) {
-			level.Error(logger).Log("msg", "failed to listen on http address", "err", err)
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			if err := httpServer.Shutdown(ctx); err != nil {
+				level.Error(logger).Log("msg", "failed to shutdown http server", "err", err)
+			}
 		})
 	}
 	{
@@ -78,6 +99,7 @@ func main() {
 			EnableEndpoint: true,
 			EnableHTTP:     true,
 			ServiceName:    "contracts",
+			Ready:          ready,
 		}
 
 		srv := middlewares.NewMetricsServer(config, cfg.PromAddr)
@@ -96,6 +118,12 @@ func main() {
 			)
 		})
 	}
+
+	{
+		g.Add(run.SignalHandler(ctx, syscall.SIGINT, syscall.SIGTERM))
+	}
+
+	ready.Store(true)
 
 	level.Info(logger).Log("msg", "starting servers")
 	if err := g.Run(); err != nil {

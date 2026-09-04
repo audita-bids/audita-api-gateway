@@ -14,19 +14,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/audita-bids/private-kit/connectors"
+	"github.com/audita-bids/private-kit/decode"
+	"github.com/audita-bids/private-kit/keys"
+	"github.com/audita-bids/private-kit/middlewares"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/agents"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/bids"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/billings"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/coupons"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/pncp"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/whitelabel"
+	"github.com/audita-bids/private-kit/query"
 	"github.com/go-kit/log"
-	"github.com/newdesksoftwares/private-kit/connectors"
-	"github.com/newdesksoftwares/private-kit/decode"
-	"github.com/newdesksoftwares/private-kit/keys"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/coupons"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
-	"github.com/newdesksoftwares/private-kit/query"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
 	"resty.dev/v3"
@@ -77,7 +78,7 @@ type service struct {
 	coupons     coupons.CouponsServiceClient
 }
 
-func NewService(logger log.Logger) Service {
+func NewService(logger log.Logger, cache *middlewares.AuthCache) Service {
 	clients := client.NewClientServiceClient(connectors.Client())
 	cdn := os.Getenv("CDN_HOST")
 
@@ -98,7 +99,7 @@ func NewService(logger log.Logger) Service {
 		svc = LoggingMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
 		svc = ValidationMiddleware(logger)(svc)
-		svc = AuthenticationMiddleware(logger, clients)(svc)
+		svc = AuthenticationMiddleware(logger, clients, cache)(svc)
 	}
 
 	return svc
@@ -239,8 +240,6 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 		if url != "" {
 			request.MobileLogoUri = url
 		}
-	} else {
-		request.MobileLogoUri = ""
 	}
 
 	if request.LogoImage != nil {
@@ -252,8 +251,6 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 		if url != "" {
 			request.LogoUri = url
 		}
-	} else {
-		request.LogoUri = ""
 	}
 
 	if request.BackgroundImage != nil {
@@ -270,6 +267,7 @@ func (s *service) UpdateWhitelabel(ctx context.Context, request *model.Whitelabe
 	return s.whitelabel.UpdateWhitelabel(ctx, &whitelabel.WhitelabelComplete{
 		Id:              request.Id,
 		ManagerId:       managerId,
+		ClearFields:     request.ClearFields,
 		CompanyName:     request.CompanyName,
 		LogoUri:         request.LogoUri,
 		MobileLogoUri:   request.MobileLogoUri,

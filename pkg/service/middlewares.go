@@ -7,17 +7,17 @@ import (
 	"fmt"
 
 	"github.com/Oudwins/zog"
+	"github.com/audita-bids/private-kit/decode"
+	"github.com/audita-bids/private-kit/middlewares"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/agents"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/bids"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/billings"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/coupons"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/pncp"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/whitelabel"
 	"github.com/go-kit/log"
-	"github.com/newdesksoftwares/private-kit/decode"
-	"github.com/newdesksoftwares/private-kit/middlewares"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/agents"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/coupons"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/pncp"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -894,12 +894,13 @@ func (mw *validationMiddleware) DeleteFavoriteBid(ctx context.Context, request *
 	return mw.next.DeleteFavoriteBid(ctx, request)
 }
 
-func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
+func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient, cache *middlewares.AuthCache) Middleware {
 	return func(next Service) Service {
 		return &authenticationMiddleware{
 			next:    next,
 			logger:  logger,
 			clients: clients,
+			cache:   cache,
 		}
 	}
 }
@@ -914,10 +915,11 @@ type authenticationMiddleware struct {
 	next    Service
 	logger  log.Logger
 	clients client.ClientServiceClient
+	cache   *middlewares.AuthCache
 }
 
 func (mw *authenticationMiddleware) GetAvailableLicenses(ctx context.Context, request *pncp.PncpAvailableLicenseRequest) (*pncp.PncpAvailableLicenseResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -935,7 +937,7 @@ func (mw *authenticationMiddleware) GetAvailableLicenses(ctx context.Context, re
 }
 
 func (mw *authenticationMiddleware) GetLicense(ctx context.Context, request *pncp.PncpFindLicenseRequest) (*pncp.PncpFindLicenseResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -953,7 +955,7 @@ func (mw *authenticationMiddleware) GetLicense(ctx context.Context, request *pnc
 }
 
 func (mw *authenticationMiddleware) PostFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.PostFavoriteBidResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -971,7 +973,7 @@ func (mw *authenticationMiddleware) PostFavoriteBid(ctx context.Context, request
 }
 
 func (mw *authenticationMiddleware) GetListFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.GetListFavoriteBidResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -989,7 +991,7 @@ func (mw *authenticationMiddleware) GetListFavoriteBid(ctx context.Context, requ
 }
 
 func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1007,7 +1009,7 @@ func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *m
 }
 
 func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1027,7 +1029,7 @@ func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request 
 }
 
 func (mw *authenticationMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1045,7 +1047,7 @@ func (mw *authenticationMiddleware) GetListHoldingBid(ctx context.Context, reque
 }
 
 func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1068,7 +1070,7 @@ func (mw *authenticationMiddleware) PostWhitelabel(ctx context.Context, request 
 }
 
 func (mw *authenticationMiddleware) GetWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1087,7 +1089,7 @@ func (mw *authenticationMiddleware) GetWhitelabel(ctx context.Context, request *
 }
 
 func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1110,7 +1112,7 @@ func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, reques
 }
 
 func (mw *authenticationMiddleware) GetBids(ctx context.Context, request *model.BidRequest) (*bids.GetListBidsResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1128,7 +1130,7 @@ func (mw *authenticationMiddleware) GetBids(ctx context.Context, request *model.
 }
 
 func (mw *authenticationMiddleware) GetBid(ctx context.Context, request *model.BidRequest) (*bids.BidComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1146,7 +1148,7 @@ func (mw *authenticationMiddleware) GetBid(ctx context.Context, request *model.B
 }
 
 func (mw *authenticationMiddleware) GetBidHandles(ctx context.Context, request *model.BidRequest) (*bids.GetBidClientHandlesResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1164,7 +1166,7 @@ func (mw *authenticationMiddleware) GetBidHandles(ctx context.Context, request *
 }
 
 func (mw *authenticationMiddleware) PostBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1182,7 +1184,7 @@ func (mw *authenticationMiddleware) PostBidProposal(ctx context.Context, request
 }
 
 func (mw *authenticationMiddleware) UpdateBidProposal(ctx context.Context, request *model.ProposalRequest) (*bids.ProposalComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1200,7 +1202,7 @@ func (mw *authenticationMiddleware) UpdateBidProposal(ctx context.Context, reque
 }
 
 func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostPaymentResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1221,7 +1223,7 @@ func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *mo
 }
 
 func (mw *authenticationMiddleware) CancelPayment(ctx context.Context, request *model.PaymentRequest) (*billings.PostCancelPaymentResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1243,7 +1245,7 @@ func (mw *authenticationMiddleware) CancelPayment(ctx context.Context, request *
 }
 
 func (mw *authenticationMiddleware) PostPlan(ctx context.Context, request *model.PlanRequest) (*billings.PlanComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1264,7 +1266,7 @@ func (mw *authenticationMiddleware) PostPlan(ctx context.Context, request *model
 }
 
 func (mw *authenticationMiddleware) GetListPlans(ctx context.Context, request *model.PlanRequest) (*billings.GetListPlansResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1287,7 +1289,7 @@ func (mw *authenticationMiddleware) GetListPlans(ctx context.Context, request *m
 }
 
 func (mw *authenticationMiddleware) GetListUserPayments(ctx context.Context, request *model.PaymentRequest) (*billings.GetListUserPaymentsResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1310,7 +1312,7 @@ func (mw *authenticationMiddleware) GetListUserPayments(ctx context.Context, req
 }
 
 func (mw *authenticationMiddleware) GetListAllUsers(ctx context.Context, request *model.ClientRequest) (*client.ListAllClientsResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1332,7 +1334,7 @@ func (mw *authenticationMiddleware) GetListAllUsers(ctx context.Context, request
 }
 
 func (mw *authenticationMiddleware) PostCreateBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1354,7 +1356,7 @@ func (mw *authenticationMiddleware) PostCreateBusinessClient(ctx context.Context
 }
 
 func (mw *authenticationMiddleware) GetListAllScopes(ctx context.Context, request *model.ScopeRequest) (*client.ListAllScopesResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1376,7 +1378,7 @@ func (mw *authenticationMiddleware) GetListAllScopes(ctx context.Context, reques
 }
 
 func (mw *authenticationMiddleware) DeleteBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*structpb.Struct, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1398,7 +1400,7 @@ func (mw *authenticationMiddleware) DeleteBusinessClient(ctx context.Context, re
 }
 
 func (mw *authenticationMiddleware) PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1420,7 +1422,7 @@ func (mw *authenticationMiddleware) PatchBusinessClient(ctx context.Context, req
 }
 
 func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1439,7 +1441,7 @@ func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request
 }
 
 func (mw *authenticationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err
@@ -1457,7 +1459,7 @@ func (mw *authenticationMiddleware) GetAndValidateCoupon(ctx context.Context, re
 }
 
 func (mw *authenticationMiddleware) DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error) {
-	user, ctx, err := middlewares.ValidateAuth(ctx, mw.clients)
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
 	if err != nil {
 		return nil, err

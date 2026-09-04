@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/automations"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/bids"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/billings"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/client"
-	"github.com/newdesksoftwares/private-kit/pkg/pb/protocols/whitelabel"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/bids"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/billings"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/whitelabel"
 )
 
 type FavoriteBidRequest struct {
@@ -74,6 +74,8 @@ type WhitelabelRequest struct {
 	LogoImage       io.Reader `json:"logo_image"`
 	MobileLogoImage io.Reader `json:"mobile_logo_image"`
 	BackgroundImage io.Reader `json:"background_image"`
+
+	ClearFields []string `json:"clear_fields"`
 }
 
 type BidRequest struct {
