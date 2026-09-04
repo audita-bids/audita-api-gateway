@@ -4,7 +4,6 @@ import (
 	apperrors "audita-api-gateway/pkg/errors"
 	"audita-api-gateway/request"
 	"context"
-	"fmt"
 
 	"github.com/Oudwins/zog"
 	"github.com/audita-bids/private-kit/decode"
@@ -1014,8 +1013,6 @@ func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request 
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println(user)
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes: []string{"hold_bids:write"},

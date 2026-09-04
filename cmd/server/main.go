@@ -17,6 +17,7 @@ import (
 
 	"github.com/audita-bids/private-kit/middlewares"
 	"github.com/audita-bids/private-kit/pkg/lib"
+	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 )
@@ -27,15 +28,12 @@ func main() {
 
 	logger := lib.SetupLogger(cfg.Debug)
 
-	redis, err := lib.Initiate()
+	authCache, closeAuthCache := handleAuthCache(logger)
 
-	if err != nil {
-		level.Error(logger).Log("msg", "failed to connect to redis", "err", err)
-		os.Exit(1)
-	}
+	defer closeAuthCache()
 
 	var (
-		svc         = service.NewService(logger, middlewares.NewAuthCache(redis.Client))
+		svc         = service.NewService(logger, authCache)
 		endpoints   = endpoint.NewEndpointSetup(svc, logger)
 		httpHandler = transports.NewHTTPServer(*endpoints, logger)
 
@@ -94,6 +92,11 @@ func main() {
 	}
 	{
 		promListener, err := net.Listen("tcp", cfg.PromAddr)
+		if err != nil {
+			level.Error(logger).Log("msg", "failed to listen on prometheus address", "err", err)
+			os.Exit(1)
+		}
+
 		config := middlewares.MetricsConfig{
 			Logger:         logger,
 			EnableEndpoint: true,
@@ -112,10 +115,12 @@ func main() {
 
 			return srv.Serve(promListener)
 		}, func(error) {
-			level.Error(logger).Log(
-				"msg", "failed to listen prometheus address",
-				"err", err,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			if err := srv.Shutdown(ctx); err != nil {
+				level.Error(logger).Log("msg", "failed to shutdown prometheus server", "err", err)
+			}
 		})
 	}
 
@@ -130,4 +135,16 @@ func main() {
 		level.Error(logger).Log("msg", "servers failed", "err", err)
 		os.Exit(1)
 	}
+}
+
+// handleAuthCache redis backs only the token cache here, so an unreachable server disables it instead of stopping the boot.
+func handleAuthCache(logger log.Logger) (*middlewares.AuthCache, func()) {
+	redis, err := lib.Initiate()
+
+	if err != nil {
+		level.Warn(logger).Log("msg", "auth cache disabled", "err", err)
+		return middlewares.NewAuthCache(nil), func() {}
+	}
+
+	return middlewares.NewAuthCache(redis.Client), func() { redis.Close() }
 }
