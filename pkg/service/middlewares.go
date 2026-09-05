@@ -4,6 +4,7 @@ import (
 	apperrors "audita-api-gateway/pkg/errors"
 	"audita-api-gateway/request"
 	"context"
+	"time"
 
 	"github.com/Oudwins/zog"
 	"github.com/audita-bids/private-kit/decode"
@@ -268,6 +269,15 @@ func (mw *loggingMiddleware) ListAutomations(ctx context.Context, request *model
 
 	mw.logger.Log("method", "ListAutomations", "status", "started")
 	return mw.next.ListAutomations(ctx, request)
+}
+
+func (mw *loggingMiddleware) PostCoupon(ctx context.Context, request *model.PostCouponRequest) (*coupons.CouponComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostCoupon", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostCoupon", "status", "started", "code", request.Code)
+	return mw.next.PostCoupon(ctx, request)
 }
 
 func (mw *loggingMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
@@ -587,6 +597,17 @@ func (mw *recoveryMiddleware) ListAutomations(ctx context.Context, request *mode
 	return mw.next.ListAutomations(ctx, request)
 }
 
+func (mw *recoveryMiddleware) PostCoupon(ctx context.Context, request *model.PostCouponRequest) (result *coupons.CouponComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostCoupon", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PostCoupon(ctx, request)
+}
+
 func (mw *recoveryMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (result *coupons.CouponComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -867,6 +888,39 @@ func (mw *validationMiddleware) ListAutomations(ctx context.Context, request *mo
 	return mw.next.ListAutomations(ctx, request)
 }
 
+func (mw *validationMiddleware) PostCoupon(ctx context.Context, request *model.PostCouponRequest) (*coupons.CouponComplete, error) {
+	// zog resolve a chave capitalizando a primeira letra, entao ela tem que ser
+	// o nome do campo em Go e nao o do JSON: "start_at" vira "Start_at", que
+	// nao existe na struct, e a validacao entra em panic.
+	schema := zog.Struct(zog.Shape{
+		"code": zog.String().
+			Required(zog.Message("Code is required")),
+		"discountPercentage": zog.Int().
+			Required(zog.Message("Discount percentage is required")).
+			GT(0, zog.Message("Discount percentage must be greater than 0")).
+			LTE(100, zog.Message("Discount percentage must be at most 100")),
+		"startAt": zog.String().
+			Required(zog.Message("Start at is required")),
+		"endAt": zog.String().
+			Required(zog.Message("End at is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	// The coupons service parses these with `time.Parse(time.RFC3339, ...)` and
+	// a bad format comes back as a gRPC Unknown, which the gateway can only
+	// render as a 500. Parsing here turns "2027-01-01" into a 400 that says so.
+	for _, v := range []string{request.StartAt, request.EndAt} {
+		if _, err := time.Parse(time.RFC3339, v); err != nil {
+			return nil, apperrors.BadRequest("invalid_date", "start_at and end_at must be RFC 3339 with an offset, e.g. 2026-09-04T00:00:00-03:00")
+		}
+	}
+
+	return mw.next.PostCoupon(ctx, request)
+}
+
 func (mw *validationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
 	schema := zog.Struct(zog.Shape{
 		"code": zog.String().
@@ -904,6 +958,13 @@ func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceCli
 	}
 }
 
+var payingPayers = []client.PayerRole{
+	client.PayerRole_Basic,
+	client.PayerRole_Pro,
+	client.PayerRole_Enterprise,
+	client.PayerRole_FreeTasting,
+}
+
 var genericPayers = []client.PayerRole{
 	client.PayerRole_Pro,
 	client.PayerRole_Enterprise,
@@ -925,7 +986,8 @@ func (mw *authenticationMiddleware) GetAvailableLicenses(ctx context.Context, re
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"licenses:read"},
+		Scopes:    []string{"licenses:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -943,7 +1005,8 @@ func (mw *authenticationMiddleware) GetLicense(ctx context.Context, request *pnc
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"licenses:read"},
+		Scopes:    []string{"licenses:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -961,7 +1024,8 @@ func (mw *authenticationMiddleware) PostFavoriteBid(ctx context.Context, request
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:write"},
+		Scopes:    []string{"bids:write"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -979,7 +1043,8 @@ func (mw *authenticationMiddleware) GetListFavoriteBid(ctx context.Context, requ
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:read"},
+		Scopes:    []string{"bids:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1015,7 +1080,8 @@ func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request 
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"hold_bids:write"},
+		Scopes:    []string{"hold_bids:write"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1033,7 +1099,8 @@ func (mw *authenticationMiddleware) GetListHoldingBid(ctx context.Context, reque
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"hold_bids:read"},
+		Scopes:    []string{"hold_bids:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1116,7 +1183,8 @@ func (mw *authenticationMiddleware) GetBids(ctx context.Context, request *model.
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:read"},
+		Scopes:    []string{"bids:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1134,7 +1202,8 @@ func (mw *authenticationMiddleware) GetBid(ctx context.Context, request *model.B
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:read"},
+		Scopes:    []string{"bids:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1152,7 +1221,8 @@ func (mw *authenticationMiddleware) GetBidHandles(ctx context.Context, request *
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:read"},
+		Scopes:    []string{"bids:read"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1170,7 +1240,8 @@ func (mw *authenticationMiddleware) PostBidProposal(ctx context.Context, request
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:write"},
+		Scopes:    []string{"bids:write"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1188,7 +1259,8 @@ func (mw *authenticationMiddleware) UpdateBidProposal(ctx context.Context, reque
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:write"},
+		Scopes:    []string{"bids:write"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {
@@ -1437,6 +1509,29 @@ func (mw *authenticationMiddleware) ListAutomations(ctx context.Context, request
 	return mw.next.ListAutomations(ctx, request)
 }
 
+func (mw *authenticationMiddleware) PostCoupon(ctx context.Context, request *model.PostCouponRequest) (*coupons.CouponComplete, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes: []string{"coupons:write"},
+		Roles: []client.ClientRole{
+			client.ClientRole_Business,
+			client.ClientRole_Admin,
+			client.ClientRole_SuperAdmin,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostCoupon(ctx, request)
+}
+
 func (mw *authenticationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
 	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
@@ -1463,7 +1558,8 @@ func (mw *authenticationMiddleware) DeleteFavoriteBid(ctx context.Context, reque
 	}
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
-		Scopes: []string{"bids:delete"},
+		Scopes:    []string{"bids:delete"},
+		PayerRole: payingPayers,
 	})
 
 	if err != nil {

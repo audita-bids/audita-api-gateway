@@ -134,8 +134,24 @@ type CouponRequest struct {
 	Code string `json:"code"`
 }
 
+type PostCouponRequest struct {
+	Code               string `json:"code"`
+	DiscountPercentage int    `json:"discount_percentage"`
+	MaxIntCents        int    `json:"max_int_cents"`
+	StartAt            string `json:"start_at"`
+	EndAt              string `json:"end_at"`
+	Active             bool   `json:"active"`
+	MaxUses            int    `json:"max_uses"`
+	Objective          string `json:"objective"`
+	ForFirstBuy        bool   `json:"for_first_buy"`
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
+}
+
+func (c *PostCouponRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(c)
 }
 
 func (f *FavoriteBidRequest) Decode(r *http.Request) error {

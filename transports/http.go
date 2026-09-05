@@ -575,6 +575,26 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 			),
 		))
 
+	r.Methods(http.MethodPost).
+		Path("/coupons").
+		Handler(httptransport.NewServer(
+			endpoint.PostCoupon,
+			decodePostCouponHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
 	r.Methods(http.MethodGet).
 		Path("/coupons/search/{code}").
 		Handler(httptransport.NewServer(
@@ -854,6 +874,17 @@ func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}
 	vars := mux.Vars(r)
 
 	req.Id = vars["id"]
+
+	return &req, nil
+}
+
+func decodePostCouponHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.PostCouponRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &req, nil
 }

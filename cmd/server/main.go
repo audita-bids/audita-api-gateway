@@ -17,7 +17,6 @@ import (
 
 	"github.com/audita-bids/private-kit/middlewares"
 	"github.com/audita-bids/private-kit/pkg/lib"
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/oklog/run"
 )
@@ -28,9 +27,18 @@ func main() {
 
 	logger := lib.SetupLogger(cfg.Debug)
 
-	authCache, closeAuthCache := handleAuthCache(logger)
+	redis, err := lib.Initiate()
 
-	defer closeAuthCache()
+	if err != nil {
+		level.Warn(logger).Log("msg", "auth cache disabled, redis unreachable", "err", err)
+	}
+
+	authCache := middlewares.NewAuthCache(nil)
+
+	if redis != nil {
+		authCache = middlewares.NewAuthCache(redis.Client)
+		defer redis.Close()
+	}
 
 	var (
 		svc         = service.NewService(logger, authCache)
@@ -135,16 +143,4 @@ func main() {
 		level.Error(logger).Log("msg", "servers failed", "err", err)
 		os.Exit(1)
 	}
-}
-
-// handleAuthCache redis backs only the token cache here, so an unreachable server disables it instead of stopping the boot.
-func handleAuthCache(logger log.Logger) (*middlewares.AuthCache, func()) {
-	redis, err := lib.Initiate()
-
-	if err != nil {
-		level.Warn(logger).Log("msg", "auth cache disabled", "err", err)
-		return middlewares.NewAuthCache(nil), func() {}
-	}
-
-	return middlewares.NewAuthCache(redis.Client), func() { redis.Close() }
 }

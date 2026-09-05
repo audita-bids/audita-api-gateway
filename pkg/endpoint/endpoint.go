@@ -40,6 +40,7 @@ type EndpointSetup struct {
 	PatchBusinessClient      endpoint.Endpoint
 	ListAutomations          endpoint.Endpoint
 	GetAndValidateCoupon     endpoint.Endpoint
+	PostCoupon               endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -70,6 +71,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var PatchBusinessClient endpoint.Endpoint
 	var ListAutomations endpoint.Endpoint
 	var GetAndValidateCoupon endpoint.Endpoint
+	var PostCoupon endpoint.Endpoint
 	var DeleteFavoriteBid endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
@@ -184,6 +186,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetAndValidateCoupon = loggingMiddleware("GetAndValidateCoupon")(GetAndValidateCoupon)
 		GetAndValidateCoupon = metricsMiddleware("GetAndValidateCoupon")(GetAndValidateCoupon)
 
+		PostCoupon = MakePostCouponEndpoint(s)
+		PostCoupon = loggingMiddleware("PostCoupon")(PostCoupon)
+		PostCoupon = metricsMiddleware("PostCoupon")(PostCoupon)
+
 		DeleteFavoriteBid = MakeDeleteFavoriteBidEndpoint(s)
 		DeleteFavoriteBid = loggingMiddleware("DeleteFavoriteBid")(DeleteFavoriteBid)
 		DeleteFavoriteBid = metricsMiddleware("DeleteFavoriteBid")(DeleteFavoriteBid)
@@ -217,6 +223,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PatchBusinessClient:      PatchBusinessClient,
 		ListAutomations:          ListAutomations,
 		GetAndValidateCoupon:     GetAndValidateCoupon,
+		PostCoupon:               PostCoupon,
 		DeleteFavoriteBid:        DeleteFavoriteBid,
 	}
 }
@@ -597,6 +604,20 @@ func MakeListAutomationsEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.AutomationsRequest)
 
 		fc, err := s.ListAutomations(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostCouponEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.PostCouponRequest)
+
+		fc, err := s.PostCoupon(ctx, r)
 
 		if err != nil {
 			return nil, err

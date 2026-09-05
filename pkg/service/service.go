@@ -62,6 +62,7 @@ type Service interface {
 	PatchBusinessClient(ctx context.Context, request *model.BusinessClientRequest) (*client.ClientComplete, error)
 	ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error)
 	GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error)
+	PostCoupon(ctx context.Context, request *model.PostCouponRequest) (*coupons.CouponComplete, error)
 }
 
 type service struct {
@@ -459,6 +460,20 @@ func (s *service) GetAndValidateCoupon(ctx context.Context, request *model.Coupo
 	return s.coupons.GetAndValidateCoupon(ctx, &coupons.GetAndValidateCouponRequest{
 		Code:   request.Code,
 		UserId: user.Id,
+	})
+}
+
+func (s *service) PostCoupon(ctx context.Context, request *model.PostCouponRequest) (*coupons.CouponComplete, error) {
+	return s.coupons.CreateCoupon(ctx, &coupons.PostCouponRequest{
+		Code:               request.Code,
+		DiscountPercentage: int32(request.DiscountPercentage),
+		MaxIntCents:        int32(request.MaxIntCents),
+		StartAt:            request.StartAt,
+		EndAt:              request.EndAt,
+		Active:             request.Active,
+		MaxUses:            int32(request.MaxUses),
+		Objective:          request.Objective,
+		ForFirstBuy:        request.ForFirstBuy,
 	})
 }
 
