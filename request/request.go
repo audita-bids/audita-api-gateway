@@ -146,11 +146,30 @@ type PostCouponRequest struct {
 	ForFirstBuy        bool   `json:"for_first_buy"`
 }
 
+type CertificateRequest struct {
+	Id             string    `json:"id"`
+	OrganizationId string    `json:"organization_id"`
+	DocumentCnpj   string    `json:"document_cnpj"`
+	Type           int       `json:"type"`
+	Title          string    `json:"title"`
+	Url            string    `json:"url"`
+	ExpiresAt      string    `json:"expires_at"`
+	File           io.Reader `json:"-"`
+	FileName       string    `json:"-"`
+	FileSize       int64     `json:"-"`
+	UpdateMask     []string  `json:"update_mask"`
+	WithinDays     int       `json:"within_days"`
+}
+
 type CdnResponse struct {
 	URL string `json:"url"`
 }
 
 func (c *PostCouponRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(c)
+}
+
+func (c *CertificateRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(c)
 }
 

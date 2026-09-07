@@ -576,6 +576,106 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 		))
 
 	r.Methods(http.MethodPost).
+		Path("/certificates").
+		Handler(httptransport.NewServer(
+			endpoint.PostCertificate,
+			decodePostCertificateHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/certificates").
+		Handler(httptransport.NewServer(
+			endpoint.ListCertificates,
+			decodeListCertificatesHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodGet).
+		Path("/certificates/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.GetCertificate,
+			decodeCertificateByIdHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPatch).
+		Path("/certificates/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.PatchCertificate,
+			decodePatchCertificateHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodDelete).
+		Path("/certificates/{id}").
+		Handler(httptransport.NewServer(
+			endpoint.DeleteCertificate,
+			decodeCertificateByIdHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		))
+
+	r.Methods(http.MethodPost).
 		Path("/coupons").
 		Handler(httptransport.NewServer(
 			endpoint.PostCoupon,
@@ -874,6 +974,73 @@ func decodeGetBidHTTP(ctx context.Context, r *http.Request) (request interface{}
 	vars := mux.Vars(r)
 
 	req.Id = vars["id"]
+
+	return &req, nil
+}
+
+func decodePostCertificateHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.CertificateRequest
+
+	if err := r.ParseMultipartForm(12 << 20); err != nil {
+		return nil, err
+	}
+
+	req.DocumentCnpj = r.FormValue("document_cnpj")
+	req.Title = r.FormValue("title")
+	req.Url = r.FormValue("url")
+	req.ExpiresAt = r.FormValue("expires_at")
+
+	if v := r.FormValue("type"); v != "" {
+		if n, convErr := strconv.Atoi(v); convErr == nil {
+			req.Type = n
+		}
+	}
+
+	if file, header, ferr := r.FormFile("file"); ferr == nil {
+		req.File = file
+		req.FileName = header.Filename
+		req.FileSize = header.Size
+	}
+
+	return &req, nil
+}
+
+func decodeCertificateByIdHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.CertificateRequest
+	vars := mux.Vars(r)
+
+	req.Id = vars["id"]
+
+	return &req, nil
+}
+
+func decodePatchCertificateHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.CertificateRequest
+
+	if err := req.Decode(r); err != nil {
+		return nil, err
+	}
+
+	vars := mux.Vars(r)
+	req.Id = vars["id"]
+
+	return &req, nil
+}
+
+func decodeListCertificatesHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.CertificateRequest
+
+	query := r.URL.Query()
+
+	if value, ok := decode.RetrieveQueryValue(query, "document_cnpj"); ok {
+		req.DocumentCnpj = value
+	}
+
+	if value, ok := decode.RetrieveQueryValue(query, "type"); ok {
+		if n, convErr := strconv.Atoi(value); convErr == nil {
+			req.Type = n
+		}
+	}
 
 	return &req, nil
 }

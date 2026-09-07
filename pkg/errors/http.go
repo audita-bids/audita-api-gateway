@@ -195,6 +195,28 @@ func classify(message string) *HTTPError {
 			Code:    "coupon_not_found",
 			Message: "coupon not found",
 		}
+	// A rejected upload is the caller's file, not our failure, and the three
+	// reasons are three different fixes: send a smaller file, send a real one,
+	// send a PDF. Flattening them into 500 would tell the user to try again,
+	// which never works.
+	case containsAny(msg, []string{"certificate file is too large"}):
+		return &HTTPError{
+			Status:  http.StatusRequestEntityTooLarge,
+			Code:    "file_too_large",
+			Message: "certificate file is too large",
+		}
+	case containsAny(msg, []string{"certificate file type is not allowed"}):
+		return &HTTPError{
+			Status:  http.StatusUnsupportedMediaType,
+			Code:    "file_type_not_allowed",
+			Message: "certificate file must be a PDF, PNG or JPEG",
+		}
+	case containsAny(msg, []string{"certificate file is empty"}):
+		return &HTTPError{
+			Status:  http.StatusBadRequest,
+			Code:    "file_empty",
+			Message: "certificate file is empty",
+		}
 	case containsAny(msg, []string{"already exists", "duplicate"}):
 		return &HTTPError{
 			Status:  http.StatusConflict,

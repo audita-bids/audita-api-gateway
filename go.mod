@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/Oudwins/zog v0.22.1
-	github.com/audita-bids/private-kit v1.0.53
+	github.com/audita-bids/private-kit v1.0.54
 	github.com/go-kit/kit v0.13.0
 	github.com/go-kit/log v0.2.1
 	github.com/gorilla/mux v1.8.1

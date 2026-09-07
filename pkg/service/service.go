@@ -2,14 +2,17 @@ package service
 
 import (
 	model "audita-api-gateway/request"
+	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,13 +25,16 @@ import (
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/bids"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/billings"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/certificates"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/coupons"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/pncp"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/whitelabel"
 	"github.com/audita-bids/private-kit/query"
+	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/log"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"resty.dev/v3"
 )
@@ -63,20 +69,41 @@ type Service interface {
 	ListAutomations(ctx context.Context, request *model.AutomationsRequest) (*automations.ListAutomationsResponse, error)
 	GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error)
 	PostCoupon(ctx context.Context, request *model.PostCouponRequest) (*coupons.CouponComplete, error)
+	PostCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error)
+	GetCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error)
+	PatchCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error)
+	DeleteCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.DeleteCertificateResponse, error)
+	ListCertificates(ctx context.Context, request *model.CertificateRequest) (*certificates.ListCertificatesResponse, error)
 }
+
+const maxCertificateBytes = 12 << 20
+
+var allowedCertificateTypes = []string{
+	"application/pdf",
+	"image/png",
+	"image/jpeg",
+}
+
+var (
+	ErrCertificateTooLarge       = errors.New("certificate file is too large")
+	ErrCertificateEmptyFile      = errors.New("certificate file is empty")
+	ErrCertificateTypeNotAllowed = errors.New("certificate file type is not allowed")
+	ErrCertificateUploadFailed   = errors.New("certificate upload failed")
+)
 
 type service struct {
 	cdnApi *resty.Client
 	logger log.Logger
 
-	pncp        pncp.PncpServiceClient
-	clients     client.ClientServiceClient
-	bids        bids.BidsServiceClient
-	agents      agents.AgentsServiceClient
-	whitelabel  whitelabel.WhitelabelServiceClient
-	billings    billings.BillingServiceClient
-	automations automations.AutomationsServiceClient
-	coupons     coupons.CouponsServiceClient
+	pncp         pncp.PncpServiceClient
+	clients      client.ClientServiceClient
+	bids         bids.BidsServiceClient
+	agents       agents.AgentsServiceClient
+	whitelabel   whitelabel.WhitelabelServiceClient
+	billings     billings.BillingServiceClient
+	automations  automations.AutomationsServiceClient
+	coupons      coupons.CouponsServiceClient
+	certificates certificates.CertificatesServiceClient
 }
 
 func NewService(logger log.Logger, cache *middlewares.AuthCache) Service {
@@ -86,16 +113,17 @@ func NewService(logger log.Logger, cache *middlewares.AuthCache) Service {
 	var svc Service
 	{
 		svc = &service{
-			cdnApi:      resty.New().SetBaseURL(cdn).SetRetryCount(2), // will do 2 retries
-			logger:      logger,
-			pncp:        pncp.NewPncpServiceClient(connectors.Pncp()),
-			bids:        bids.NewBidsServiceClient(connectors.Bids()),
-			clients:     clients,
-			agents:      agents.NewAgentsServiceClient(connectors.Agents()),
-			whitelabel:  whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
-			billings:    billings.NewBillingServiceClient(connectors.Billings()),
-			automations: automations.NewAutomationsServiceClient(connectors.Automations()),
-			coupons:     coupons.NewCouponsServiceClient(connectors.Coupons()),
+			cdnApi:       resty.New().SetBaseURL(cdn).SetRetryCount(2), // will do 2 retries
+			logger:       logger,
+			pncp:         pncp.NewPncpServiceClient(connectors.Pncp()),
+			bids:         bids.NewBidsServiceClient(connectors.Bids()),
+			clients:      clients,
+			agents:       agents.NewAgentsServiceClient(connectors.Agents()),
+			whitelabel:   whitelabel.NewWhitelabelServiceClient(connectors.Whitelabel()),
+			billings:     billings.NewBillingServiceClient(connectors.Billings()),
+			automations:  automations.NewAutomationsServiceClient(connectors.Automations()),
+			coupons:      coupons.NewCouponsServiceClient(connectors.Coupons()),
+			certificates: certificates.NewCertificatesServiceClient(connectors.Certificates()),
 		}
 		svc = LoggingMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
@@ -474,6 +502,138 @@ func (s *service) PostCoupon(ctx context.Context, request *model.PostCouponReque
 		MaxUses:            int32(request.MaxUses),
 		Objective:          request.Objective,
 		ForFirstBuy:        request.ForFirstBuy,
+	})
+}
+
+func (s *service) PostCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	organizationId := user.OwnerId
+
+	if organizationId == "" && user.Role == client.ClientRole_Business {
+		organizationId = user.Id
+	}
+
+	url := request.Url
+
+	if request.File != nil {
+		if request.FileSize > maxCertificateBytes {
+			level.Error(s.logger).Log("during", "post_certificate > size", "error", ErrCertificateTooLarge, "bytes", request.FileSize)
+			return nil, ErrCertificateTooLarge
+		}
+
+		head := make([]byte, 512)
+		read, err := io.ReadFull(request.File, head)
+
+		if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+			level.Error(s.logger).Log("during", "post_certificate > read", "error", err)
+			return nil, err
+		}
+
+		head = head[:read]
+
+		if read == 0 {
+			level.Error(s.logger).Log("during", "post_certificate > read", "error", ErrCertificateEmptyFile)
+			return nil, ErrCertificateEmptyFile
+		}
+
+		detected := http.DetectContentType(head)
+
+		if !slices.Contains(allowedCertificateTypes, detected) {
+			level.Error(s.logger).Log("during", "post_certificate > content type", "error", ErrCertificateTypeNotAllowed, "detected", detected)
+			return nil, ErrCertificateTypeNotAllowed
+		}
+
+		url, err = s.uploadFile(io.MultiReader(bytes.NewReader(head), request.File), request.FileName)
+
+		if err != nil {
+			level.Error(s.logger).Log("during", "post_certificate > upload", "error", err)
+			return nil, err
+		}
+
+		if url == "" {
+			level.Error(s.logger).Log("during", "post_certificate > upload", "error", ErrCertificateUploadFailed)
+			return nil, ErrCertificateUploadFailed
+		}
+	}
+
+	return s.certificates.CreateCertificate(ctx, &certificates.PostCertificateRequest{
+		UserId:         user.Id,
+		OrganizationId: organizationId,
+		DocumentCnpj:   request.DocumentCnpj,
+		Type:           certificates.CertificateType(request.Type),
+		Title:          request.Title,
+		Url:            url,
+		ExpiresAt:      request.ExpiresAt,
+	})
+}
+
+func (s *service) GetCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	organizationId := user.OwnerId
+
+	if organizationId == "" && user.Role == client.ClientRole_Business {
+		organizationId = user.Id
+	}
+
+	return s.certificates.GetCertificate(ctx, &certificates.GetCertificateRequest{
+		Id:             request.Id,
+		OrganizationId: organizationId,
+	})
+}
+
+func (s *service) PatchCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	organizationId := user.OwnerId
+
+	if organizationId == "" && user.Role == client.ClientRole_Business {
+		organizationId = user.Id
+	}
+
+	return s.certificates.UpdateCertificate(ctx, &certificates.UpdateCertificateRequest{
+		Certificate: &certificates.CertificateComplete{
+			Id:             request.Id,
+			OrganizationId: organizationId,
+			DocumentCnpj:   request.DocumentCnpj,
+			Type:           certificates.CertificateType(request.Type),
+			Title:          request.Title,
+			Url:            request.Url,
+			ExpiresAt:      request.ExpiresAt,
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: request.UpdateMask},
+	})
+}
+
+func (s *service) DeleteCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.DeleteCertificateResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	organizationId := user.OwnerId
+
+	if organizationId == "" && user.Role == client.ClientRole_Business {
+		organizationId = user.Id
+	}
+
+	return s.certificates.DeleteCertificate(ctx, &certificates.DeleteCertificateRequest{
+		Id:             request.Id,
+		OrganizationId: organizationId,
+	})
+}
+
+func (s *service) ListCertificates(ctx context.Context, request *model.CertificateRequest) (*certificates.ListCertificatesResponse, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	organizationId := user.OwnerId
+
+	if organizationId == "" && user.Role == client.ClientRole_Business {
+		organizationId = user.Id
+	}
+
+	return s.certificates.ListCertificates(ctx, &certificates.ListCertificatesRequest{
+		OrganizationId: organizationId,
+		DocumentCnpj:   request.DocumentCnpj,
+		Type:           certificates.CertificateType(request.Type),
 	})
 }
 

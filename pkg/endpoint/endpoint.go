@@ -41,6 +41,11 @@ type EndpointSetup struct {
 	ListAutomations          endpoint.Endpoint
 	GetAndValidateCoupon     endpoint.Endpoint
 	PostCoupon               endpoint.Endpoint
+	PostCertificate          endpoint.Endpoint
+	GetCertificate           endpoint.Endpoint
+	PatchCertificate         endpoint.Endpoint
+	DeleteCertificate        endpoint.Endpoint
+	ListCertificates         endpoint.Endpoint
 }
 
 func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
@@ -72,6 +77,11 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var ListAutomations endpoint.Endpoint
 	var GetAndValidateCoupon endpoint.Endpoint
 	var PostCoupon endpoint.Endpoint
+	var PostCertificate endpoint.Endpoint
+	var GetCertificate endpoint.Endpoint
+	var PatchCertificate endpoint.Endpoint
+	var DeleteCertificate endpoint.Endpoint
+	var ListCertificates endpoint.Endpoint
 	var DeleteFavoriteBid endpoint.Endpoint
 
 	loggingMiddleware := middlewares.EndpointLoggingMiddleware(logger, "audita-api-gateway")
@@ -190,6 +200,26 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostCoupon = loggingMiddleware("PostCoupon")(PostCoupon)
 		PostCoupon = metricsMiddleware("PostCoupon")(PostCoupon)
 
+		PostCertificate = MakePostCertificateEndpoint(s)
+		PostCertificate = loggingMiddleware("PostCertificate")(PostCertificate)
+		PostCertificate = metricsMiddleware("PostCertificate")(PostCertificate)
+
+		GetCertificate = MakeGetCertificateEndpoint(s)
+		GetCertificate = loggingMiddleware("GetCertificate")(GetCertificate)
+		GetCertificate = metricsMiddleware("GetCertificate")(GetCertificate)
+
+		PatchCertificate = MakePatchCertificateEndpoint(s)
+		PatchCertificate = loggingMiddleware("PatchCertificate")(PatchCertificate)
+		PatchCertificate = metricsMiddleware("PatchCertificate")(PatchCertificate)
+
+		DeleteCertificate = MakeDeleteCertificateEndpoint(s)
+		DeleteCertificate = loggingMiddleware("DeleteCertificate")(DeleteCertificate)
+		DeleteCertificate = metricsMiddleware("DeleteCertificate")(DeleteCertificate)
+
+		ListCertificates = MakeListCertificatesEndpoint(s)
+		ListCertificates = loggingMiddleware("ListCertificates")(ListCertificates)
+		ListCertificates = metricsMiddleware("ListCertificates")(ListCertificates)
+
 		DeleteFavoriteBid = MakeDeleteFavoriteBidEndpoint(s)
 		DeleteFavoriteBid = loggingMiddleware("DeleteFavoriteBid")(DeleteFavoriteBid)
 		DeleteFavoriteBid = metricsMiddleware("DeleteFavoriteBid")(DeleteFavoriteBid)
@@ -224,6 +254,11 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		ListAutomations:          ListAutomations,
 		GetAndValidateCoupon:     GetAndValidateCoupon,
 		PostCoupon:               PostCoupon,
+		PostCertificate:          PostCertificate,
+		GetCertificate:           GetCertificate,
+		PatchCertificate:         PatchCertificate,
+		DeleteCertificate:        DeleteCertificate,
+		ListCertificates:         ListCertificates,
 		DeleteFavoriteBid:        DeleteFavoriteBid,
 	}
 }
@@ -604,6 +639,76 @@ func MakeListAutomationsEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.AutomationsRequest)
 
 		fc, err := s.ListAutomations(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostCertificateEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CertificateRequest)
+
+		fc, err := s.PostCertificate(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeGetCertificateEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CertificateRequest)
+
+		fc, err := s.GetCertificate(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePatchCertificateEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CertificateRequest)
+
+		fc, err := s.PatchCertificate(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeDeleteCertificateEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CertificateRequest)
+
+		fc, err := s.DeleteCertificate(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakeListCertificatesEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CertificateRequest)
+
+		fc, err := s.ListCertificates(ctx, r)
 
 		if err != nil {
 			return nil, err

@@ -2,8 +2,9 @@ package service
 
 import (
 	apperrors "audita-api-gateway/pkg/errors"
-	"audita-api-gateway/request"
+	model "audita-api-gateway/request"
 	"context"
+	"slices"
 	"time"
 
 	"github.com/Oudwins/zog"
@@ -13,6 +14,7 @@ import (
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/bids"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/billings"
+	"github.com/audita-bids/private-kit/pkg/pb/protocols/certificates"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/client"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/coupons"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/pncp"
@@ -278,6 +280,51 @@ func (mw *loggingMiddleware) PostCoupon(ctx context.Context, request *model.Post
 
 	mw.logger.Log("method", "PostCoupon", "status", "started", "code", request.Code)
 	return mw.next.PostCoupon(ctx, request)
+}
+
+func (mw *loggingMiddleware) PostCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostCertificate", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostCertificate", "status", "started")
+	return mw.next.PostCertificate(ctx, request)
+}
+
+func (mw *loggingMiddleware) GetCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "GetCertificate", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "GetCertificate", "status", "started")
+	return mw.next.GetCertificate(ctx, request)
+}
+
+func (mw *loggingMiddleware) PatchCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PatchCertificate", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PatchCertificate", "status", "started")
+	return mw.next.PatchCertificate(ctx, request)
+}
+
+func (mw *loggingMiddleware) DeleteCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.DeleteCertificateResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "DeleteCertificate", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "DeleteCertificate", "status", "started")
+	return mw.next.DeleteCertificate(ctx, request)
+}
+
+func (mw *loggingMiddleware) ListCertificates(ctx context.Context, request *model.CertificateRequest) (*certificates.ListCertificatesResponse, error) {
+	defer func() {
+		mw.logger.Log("method", "ListCertificates", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "ListCertificates", "status", "started")
+	return mw.next.ListCertificates(ctx, request)
 }
 
 func (mw *loggingMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
@@ -608,6 +655,61 @@ func (mw *recoveryMiddleware) PostCoupon(ctx context.Context, request *model.Pos
 	return mw.next.PostCoupon(ctx, request)
 }
 
+func (mw *recoveryMiddleware) PostCertificate(ctx context.Context, request *model.CertificateRequest) (result *certificates.CertificateComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostCertificate", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PostCertificate(ctx, request)
+}
+
+func (mw *recoveryMiddleware) GetCertificate(ctx context.Context, request *model.CertificateRequest) (result *certificates.CertificateComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "GetCertificate", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.GetCertificate(ctx, request)
+}
+
+func (mw *recoveryMiddleware) PatchCertificate(ctx context.Context, request *model.CertificateRequest) (result *certificates.CertificateComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PatchCertificate", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PatchCertificate(ctx, request)
+}
+
+func (mw *recoveryMiddleware) DeleteCertificate(ctx context.Context, request *model.CertificateRequest) (result *certificates.DeleteCertificateResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "DeleteCertificate", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.DeleteCertificate(ctx, request)
+}
+
+func (mw *recoveryMiddleware) ListCertificates(ctx context.Context, request *model.CertificateRequest) (result *certificates.ListCertificatesResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "ListCertificates", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.ListCertificates(ctx, request)
+}
+
 func (mw *recoveryMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (result *coupons.CouponComplete, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -919,6 +1021,82 @@ func (mw *validationMiddleware) PostCoupon(ctx context.Context, request *model.P
 	}
 
 	return mw.next.PostCoupon(ctx, request)
+}
+
+func (mw *validationMiddleware) PostCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"title": zog.String().
+			Required(zog.Message("Title is required")),
+		"expiresAt": zog.String().
+			Required(zog.Message("Expires at is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	if _, err := time.Parse(time.RFC3339, request.ExpiresAt); err != nil {
+		return nil, apperrors.BadRequest("invalid_date", "expires_at must be RFC 3339 with an offset, e.g. 2027-01-01T00:00:00-03:00")
+	}
+
+	if request.File == nil && request.Url == "" {
+		return nil, apperrors.BadRequest("file_required", "send a file or an url")
+	}
+
+	return mw.next.PostCertificate(ctx, request)
+}
+
+func (mw *validationMiddleware) GetCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"id": zog.String().
+			Required(zog.Message("Id is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.GetCertificate(ctx, request)
+}
+
+func (mw *validationMiddleware) PatchCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"id": zog.String().
+			Required(zog.Message("Id is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	if len(request.UpdateMask) == 0 {
+		return nil, apperrors.BadRequest("update_mask_required", "update_mask must name at least one field")
+	}
+
+	if slices.Contains(request.UpdateMask, "expires_at") {
+		if _, err := time.Parse(time.RFC3339, request.ExpiresAt); err != nil {
+			return nil, apperrors.BadRequest("invalid_date", "expires_at must be RFC 3339 with an offset, e.g. 2027-01-01T00:00:00-03:00")
+		}
+	}
+
+	return mw.next.PatchCertificate(ctx, request)
+}
+
+func (mw *validationMiddleware) DeleteCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.DeleteCertificateResponse, error) {
+	schema := zog.Struct(zog.Shape{
+		"id": zog.String().
+			Required(zog.Message("Id is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.DeleteCertificate(ctx, request)
+}
+
+func (mw *validationMiddleware) ListCertificates(ctx context.Context, request *model.CertificateRequest) (*certificates.ListCertificatesResponse, error) {
+	return mw.next.ListCertificates(ctx, request)
 }
 
 func (mw *validationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
@@ -1279,9 +1457,6 @@ func (mw *authenticationMiddleware) PostPayment(ctx context.Context, request *mo
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes: []string{"payments:write"},
-		Roles: []client.ClientRole{
-			client.ClientRole_Business,
-		},
 	})
 
 	if err != nil {
@@ -1530,6 +1705,101 @@ func (mw *authenticationMiddleware) PostCoupon(ctx context.Context, request *mod
 	}
 
 	return mw.next.PostCoupon(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PostCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes:    []string{"certificates:write"},
+		PayerRole: payingPayers,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PostCertificate(ctx, request)
+}
+
+func (mw *authenticationMiddleware) GetCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes:    []string{"certificates:read"},
+		PayerRole: payingPayers,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.GetCertificate(ctx, request)
+}
+
+func (mw *authenticationMiddleware) PatchCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.CertificateComplete, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes:    []string{"certificates:write"},
+		PayerRole: payingPayers,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.PatchCertificate(ctx, request)
+}
+
+func (mw *authenticationMiddleware) DeleteCertificate(ctx context.Context, request *model.CertificateRequest) (*certificates.DeleteCertificateResponse, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes:    []string{"certificates:delete"},
+		PayerRole: payingPayers,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.DeleteCertificate(ctx, request)
+}
+
+func (mw *authenticationMiddleware) ListCertificates(ctx context.Context, request *model.CertificateRequest) (*certificates.ListCertificatesResponse, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes:    []string{"certificates:read"},
+		PayerRole: payingPayers,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return mw.next.ListCertificates(ctx, request)
 }
 
 func (mw *authenticationMiddleware) GetAndValidateCoupon(ctx context.Context, request *model.CouponRequest) (*coupons.CouponComplete, error) {
