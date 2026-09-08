@@ -1125,13 +1125,12 @@ func (mw *validationMiddleware) DeleteFavoriteBid(ctx context.Context, request *
 	return mw.next.DeleteFavoriteBid(ctx, request)
 }
 
-func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient, cache *middlewares.AuthCache) Middleware {
+func AuthenticationMiddleware(logger log.Logger, clients client.ClientServiceClient) Middleware {
 	return func(next Service) Service {
 		return &authenticationMiddleware{
 			next:    next,
 			logger:  logger,
 			clients: clients,
-			cache:   cache,
 		}
 	}
 }

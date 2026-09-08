@@ -20,7 +20,6 @@ import (
 	"github.com/audita-bids/private-kit/connectors"
 	"github.com/audita-bids/private-kit/decode"
 	"github.com/audita-bids/private-kit/keys"
-	"github.com/audita-bids/private-kit/middlewares"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/agents"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/automations"
 	"github.com/audita-bids/private-kit/pkg/pb/protocols/bids"
@@ -106,7 +105,7 @@ type service struct {
 	certificates certificates.CertificatesServiceClient
 }
 
-func NewService(logger log.Logger, cache *middlewares.AuthCache) Service {
+func NewService(logger log.Logger) Service {
 	clients := client.NewClientServiceClient(connectors.Client())
 	cdn := os.Getenv("CDN_HOST")
 
@@ -128,7 +127,7 @@ func NewService(logger log.Logger, cache *middlewares.AuthCache) Service {
 		svc = LoggingMiddleware(logger)(svc)
 		svc = RecoveryMiddleware(logger)(svc)
 		svc = ValidationMiddleware(logger)(svc)
-		svc = AuthenticationMiddleware(logger, clients, cache)(svc)
+		svc = AuthenticationMiddleware(logger, clients)(svc)
 	}
 
 	return svc

@@ -27,21 +27,8 @@ func main() {
 
 	logger := lib.SetupLogger(cfg.Debug)
 
-	redis, err := lib.Initiate()
-
-	if err != nil {
-		level.Warn(logger).Log("msg", "auth cache disabled, redis unreachable", "err", err)
-	}
-
-	authCache := middlewares.NewAuthCache(nil)
-
-	if redis != nil {
-		authCache = middlewares.NewAuthCache(redis.Client)
-		defer redis.Close()
-	}
-
 	var (
-		svc         = service.NewService(logger, authCache)
+		svc         = service.NewService(logger)
 		endpoints   = endpoint.NewEndpointSetup(svc, logger)
 		httpHandler = transports.NewHTTPServer(*endpoints, logger)
 

@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var analysisLimiter = ratelimit.New(rate.Every(6*time.Minute), 3, ratelimit.ByToken)
+var analysisLimiter = ratelimit.New(rate.Every(1*time.Minute), 5, ratelimit.ByToken)
 
 func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Handler {
 	r := mux.NewRouter()
