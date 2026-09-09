@@ -1715,7 +1715,7 @@ func (mw *authenticationMiddleware) PostCertificate(ctx context.Context, request
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"certificates:write"},
-		PayerRole: payingPayers,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -1734,7 +1734,7 @@ func (mw *authenticationMiddleware) GetCertificate(ctx context.Context, request 
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"certificates:read"},
-		PayerRole: payingPayers,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -1753,7 +1753,7 @@ func (mw *authenticationMiddleware) PatchCertificate(ctx context.Context, reques
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"certificates:write"},
-		PayerRole: payingPayers,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -1772,7 +1772,7 @@ func (mw *authenticationMiddleware) DeleteCertificate(ctx context.Context, reque
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"certificates:delete"},
-		PayerRole: payingPayers,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
@@ -1791,7 +1791,7 @@ func (mw *authenticationMiddleware) ListCertificates(ctx context.Context, reques
 
 	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
 		Scopes:    []string{"certificates:read"},
-		PayerRole: payingPayers,
+		PayerRole: genericPayers,
 	})
 
 	if err != nil {
