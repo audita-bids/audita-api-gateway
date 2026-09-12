@@ -18,6 +18,7 @@ type EndpointSetup struct {
 	PostFavoriteBid          endpoint.Endpoint
 	DeleteFavoriteBid        endpoint.Endpoint
 	PostAnalysis             endpoint.Endpoint
+	PostCopilot              endpoint.Endpoint
 	PostHoldingBid           endpoint.Endpoint
 	GetListHoldingBid        endpoint.Endpoint
 	PostWhitelabel           endpoint.Endpoint
@@ -54,6 +55,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 	var GetListFavoriteBid endpoint.Endpoint
 	var PostFavoriteBid endpoint.Endpoint
 	var PostAnalysis endpoint.Endpoint
+	var PostCopilot endpoint.Endpoint
 	var PostHoldingBid endpoint.Endpoint
 	var GetListHoldingBid endpoint.Endpoint
 	var PostWhitelabel endpoint.Endpoint
@@ -107,6 +109,10 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		PostAnalysis = MakePostAnalysisEndpoint(s)
 		PostAnalysis = loggingMiddleware("PostAnalysis")(PostAnalysis)
 		PostAnalysis = metricsMiddleware("PostAnalysis")(PostAnalysis)
+
+		PostCopilot = MakePostCopilotEndpoint(s)
+		PostCopilot = loggingMiddleware("PostCopilot")(PostCopilot)
+		PostCopilot = metricsMiddleware("PostCopilot")(PostCopilot)
 
 		PostHoldingBid = MakePostHoldingBidEndpoint(s)
 		PostHoldingBid = loggingMiddleware("PostHoldingBid")(PostHoldingBid)
@@ -231,6 +237,7 @@ func NewEndpointSetup(s service.Service, logger log.Logger) *EndpointSetup {
 		GetListFavoriteBid:       GetListFavoriteBid,
 		PostFavoriteBid:          PostFavoriteBid,
 		PostAnalysis:             PostAnalysis,
+		PostCopilot:              PostCopilot,
 		PostHoldingBid:           PostHoldingBid,
 		GetListHoldingBid:        GetListHoldingBid,
 		PostWhitelabel:           PostWhitelabel,
@@ -338,6 +345,20 @@ func MakePostAnalysisEndpoint(s service.Service) endpoint.Endpoint {
 		r := request.(*model.AnalysisRequest)
 
 		fc, err := s.PostAnalysis(ctx, r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return fc, nil
+	}
+}
+
+func MakePostCopilotEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		r := request.(*model.CopilotRequest)
+
+		fc, err := s.PostCopilot(ctx, r)
 
 		if err != nil {
 			return nil, err

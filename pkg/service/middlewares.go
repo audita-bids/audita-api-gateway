@@ -84,6 +84,15 @@ func (mw *loggingMiddleware) PostAnalysis(ctx context.Context, request *model.An
 	return mw.next.PostAnalysis(ctx, request)
 }
 
+func (mw *loggingMiddleware) PostCopilot(ctx context.Context, request *model.CopilotRequest) (*agents.AgentsComplete, error) {
+	defer func() {
+		mw.logger.Log("method", "PostCopilot", "status", "completed")
+	}()
+
+	mw.logger.Log("method", "PostCopilot", "status", "started")
+	return mw.next.PostCopilot(ctx, request)
+}
+
 func (mw *loggingMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
 	defer func() {
 		mw.logger.Log("method", "PostHoldingBid", "status", "completed")
@@ -412,6 +421,17 @@ func (mw *recoveryMiddleware) PostAnalysis(ctx context.Context, request *model.A
 	}()
 
 	return mw.next.PostAnalysis(ctx, request)
+}
+
+func (mw *recoveryMiddleware) PostCopilot(ctx context.Context, request *model.CopilotRequest) (resp *agents.AgentsComplete, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			mw.logger.Log("method", "PostCopilot", "status", "recovered", "error", r)
+			err = apperrors.Internal("internal server error")
+		}
+	}()
+
+	return mw.next.PostCopilot(ctx, request)
 }
 
 func (mw *recoveryMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (resp *bids.HoldingBidComplete, err error) {
@@ -792,6 +812,18 @@ func (mw *validationMiddleware) PostAnalysis(ctx context.Context, request *model
 	return mw.next.PostAnalysis(ctx, request)
 }
 
+func (mw *validationMiddleware) PostCopilot(ctx context.Context, request *model.CopilotRequest) (*agents.AgentsComplete, error) {
+	schema := zog.Struct(zog.Shape{
+		"Message": zog.String().Required(zog.Message("Message is required")),
+	})
+
+	if err := schema.Validate(request); err != nil {
+		return nil, decode.ErrorFields(err)
+	}
+
+	return mw.next.PostCopilot(ctx, request)
+}
+
 func (mw *validationMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
 	schema := zog.Struct(zog.Shape{
 		"BidId": zog.String().Required(zog.Message("Bid ID is required")),
@@ -806,7 +838,8 @@ func (mw *validationMiddleware) PostHoldingBid(ctx context.Context, request *mod
 
 func (mw *validationMiddleware) GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error) {
 	schema := zog.Struct(zog.Shape{
-		"PublicationMonth": zog.Int32().Required(),
+		"PublicationMonth": zog.Int32(),
+		"PublicationYear":  zog.Int32(),
 	})
 
 	if err := schema.Validate(request); err != nil {
@@ -1148,6 +1181,11 @@ var genericPayers = []client.PayerRole{
 	client.PayerRole_FreeTasting,
 }
 
+var copilotPayers = []client.PayerRole{
+	client.PayerRole_Pro,
+	client.PayerRole_Enterprise,
+}
+
 type authenticationMiddleware struct {
 	next    Service
 	logger  log.Logger
@@ -1249,6 +1287,24 @@ func (mw *authenticationMiddleware) PostAnalysis(ctx context.Context, request *m
 	return mw.next.PostAnalysis(ctx, request)
 }
 
+func (mw *authenticationMiddleware) PostCopilot(ctx context.Context, request *model.CopilotRequest) (*agents.AgentsComplete, error) {
+	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = middlewares.ValidateScopes(user, &middlewares.Scoping{
+		Scopes:    []string{"ai:write"},
+		PayerRole: copilotPayers,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return mw.next.PostCopilot(ctx, request)
+}
+
 func (mw *authenticationMiddleware) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
 	user, ctx, err := middlewares.ValidateAuthCached(ctx, mw.clients, mw.cache)
 
@@ -1342,6 +1398,7 @@ func (mw *authenticationMiddleware) UpdateWhitelabel(ctx context.Context, reques
 		Roles: []client.ClientRole{
 			client.ClientRole_Business,
 			client.ClientRole_Admin,
+			client.ClientRole_SuperAdmin,
 		},
 	})
 

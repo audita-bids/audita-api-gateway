@@ -29,6 +29,11 @@ type AnalysisRequest struct {
 	UserId string `json:"user_id"`
 }
 
+type CopilotRequest struct {
+	Message string `json:"message"`
+	UserId  string `json:"user_id"`
+}
+
 type IntegrationRequest struct {
 	StartDate    string `json:"start_date"`
 	Uf           string `json:"uf"`
@@ -45,6 +50,7 @@ type HoldingRequest struct {
 	UserId           string         `json:"user_id"`
 	BidId            string         `json:"bid_id"`
 	PublicationMonth int32          `json:"publication_month"`
+	PublicationYear  int32          `json:"publication_year"`
 	Origin           bids.BidOrigin `json:"origin"`
 }
 
@@ -183,6 +189,10 @@ func (i *IntegrationRequest) Decode(r *http.Request) error {
 
 func (a *AnalysisRequest) Decode(r *http.Request) error {
 	return json.NewDecoder(r.Body).Decode(a)
+}
+
+func (c *CopilotRequest) Decode(r *http.Request) error {
+	return json.NewDecoder(r.Body).Decode(c)
 }
 
 func (h *HoldingRequest) Decode(r *http.Request) error {

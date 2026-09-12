@@ -34,6 +34,8 @@ import (
 
 var analysisLimiter = ratelimit.New(rate.Every(1*time.Minute), 5, ratelimit.ByToken)
 
+var copilotLimiter = ratelimit.New(rate.Every(1*time.Minute), 15, ratelimit.ByToken)
+
 func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Handler {
 	r := mux.NewRouter()
 	apmgorilla.Instrument(r)
@@ -122,6 +124,26 @@ func NewHTTPServer(endpoint endpoint.EndpointSetup, logger log.Logger) http.Hand
 		Handler(analysisLimiter.Middleware(httptransport.NewServer(
 			endpoint.PostAnalysis,
 			decodeAnalysisHTTP,
+			encodeHttpResponse,
+			httptransport.ServerErrorEncoder(encodeError),
+			httptransport.ServerBefore(
+				func(ctx context.Context, r *http.Request) context.Context {
+					return decode.InjectHeaderToContext(ctx, r, []decode.HeaderToContext{
+						{
+							Key:    keys.AuthTokenContext,
+							Header: "Authorization",
+							Value:  r.Header.Get("Authorization"),
+						},
+					})
+				},
+			),
+		)))
+
+	r.Methods(http.MethodPost).
+		Path("/copilot").
+		Handler(copilotLimiter.Middleware(httptransport.NewServer(
+			endpoint.PostCopilot,
+			decodeCopilotHTTP,
 			encodeHttpResponse,
 			httptransport.ServerErrorEncoder(encodeError),
 			httptransport.ServerBefore(
@@ -794,6 +816,16 @@ func decodeGetListHoldingBidHTTP(ctx context.Context, r *http.Request) (request 
 		req.PublicationMonth = int32(converted)
 	}
 
+	if value, ok := decode.RetrieveQueryValue(query, "publication_year"); ok {
+		converted, err := strconv.Atoi(value)
+
+		if err != nil {
+			return nil, nil
+		}
+
+		req.PublicationYear = int32(converted)
+	}
+
 	return &req, nil
 }
 
@@ -826,6 +858,17 @@ func decodeAnalysisHTTP(ctx context.Context, r *http.Request) (request interface
 	}
 
 	req.BidId = mux.Vars(r)["bid_id"]
+
+	return &req, nil
+}
+
+func decodeCopilotHTTP(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req model.CopilotRequest
+	err = req.Decode(r)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &req, nil
 }

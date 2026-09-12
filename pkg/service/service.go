@@ -45,6 +45,7 @@ type Service interface {
 	DeleteFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.DeleteFavoriteBidResponse, error)
 	GetListFavoriteBid(ctx context.Context, request *model.FavoriteBidRequest) (*bids.GetListFavoriteBidResponse, error)
 	PostAnalysis(ctx context.Context, request *model.AnalysisRequest) (*agents.AgentsComplete, error)
+	PostCopilot(ctx context.Context, request *model.CopilotRequest) (*agents.AgentsComplete, error)
 	PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error)
 	GetListHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.GetListHoldingBidResponse, error)
 	PostWhitelabel(ctx context.Context, request *model.WhitelabelRequest) (*whitelabel.WhitelabelComplete, error)
@@ -198,6 +199,17 @@ func (s *service) PostAnalysis(ctx context.Context, request *model.AnalysisReque
 	})
 }
 
+func (s *service) PostCopilot(ctx context.Context, request *model.CopilotRequest) (*agents.AgentsComplete, error) {
+	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
+
+	request.UserId = user.Id
+
+	return s.agents.PostCopilot(ctx, &agents.PostCopilotRequest{
+		UserId:  request.UserId,
+		Message: request.Message,
+	})
+}
+
 func (s *service) PostHoldingBid(ctx context.Context, request *model.HoldingRequest) (*bids.HoldingBidComplete, error) {
 	user, _ := decode.GetFromContext[*client.ClientComplete](ctx, keys.ClientContext)
 
@@ -218,6 +230,7 @@ func (s *service) GetListHoldingBid(ctx context.Context, request *model.HoldingR
 	return s.bids.GetListHoldingBid(genericListFilter(ctx, &filter), &bids.GetListHoldingBidRequest{
 		UserId:           request.UserId,
 		PublicationMonth: request.PublicationMonth,
+		PublicationYear:  request.PublicationYear,
 	})
 }
 
